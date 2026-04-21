@@ -14,6 +14,22 @@ data:
 {{ .Files.Get "files/db/init.sql" | indent 4 }}
   01-migrations.sql: |
 {{ .Files.Get "files/db/migrations.sql" | indent 4 }}
+  # Enable the Supabase-critical extensions that are preloaded via
+  # shared_preload_libraries. Upstream init/migrations only create
+  # uuid-ossp, pgcrypto, pg_graphql, pgsodium, supabase_vault — the rest
+  # need an explicit CREATE EXTENSION. pg_net/pg_cron create their own
+  # dedicated schemas (net, cron); grants on `net` live in 98-webhooks.sql.
+  # pgjwt is wrapped in a DO block: the .so may be missing from some images
+  # and we don't want that to fail the whole initdb.
+  97-extensions.sql: |
+    CREATE EXTENSION IF NOT EXISTS pg_stat_statements WITH SCHEMA extensions;
+    CREATE EXTENSION IF NOT EXISTS pg_net;
+    DO $$
+    BEGIN
+      CREATE EXTENSION IF NOT EXISTS pgjwt WITH SCHEMA extensions;
+    EXCEPTION WHEN OTHERS THEN
+      RAISE NOTICE 'Could not create pgjwt extension: %', SQLERRM;
+    END $$;
   99-realtime.sql: |
     CREATE SCHEMA IF NOT EXISTS _realtime;
     ALTER SCHEMA _realtime OWNER TO supabase_admin;

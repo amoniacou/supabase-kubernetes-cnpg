@@ -54,10 +54,15 @@ spec:
             - name: POSTGRES_DB
               value: {{ .Values.secret.db.database | default "postgres" | quote }}
 
+            # Studio encrypts this password with PG_META_CRYPTO_KEY and passes
+            # it to pg-meta on every /query. pg-meta connects as supabase_admin
+            # (its PG_META_DB_USER), so the password must match supabase_admin's
+            # — not postgres's. In a per-role setup where every Postgres role
+            # has its own password, these two roles differ.
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "supabase.secret.dbRole" (dict "root" $ "role" "postgres") }}
+                  name: {{ include "supabase.secret.dbRole" (dict "root" $ "role" "supabase_admin") }}
                   key: password
 
             - name: PG_META_CRYPTO_KEY

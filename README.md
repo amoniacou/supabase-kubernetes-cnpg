@@ -40,8 +40,14 @@ values/               # (optional) per-environment values overrides
 # 2. Deploy Supabase (release name defaults to "supabase")
 ./scripts/helm-deploy.sh --cluster dev
 
-# 3. Open http://supabase.local.gd once pods are Ready
+# 3. Add the /etc/hosts entry the deploy script prints, e.g.:
+#      172.30.0.4  supabase.supabase.local
+#    Then open http://supabase.supabase.local once pods are Ready.
 kubectl --context kind-dev -n supabase get pods
+
+# Studio login (HTTP Basic Auth through Kong). Password is random per release:
+kubectl --context kind-dev -n supabase get secret supabase-supabase-dashboard \
+  -o jsonpath='{.data.password}' | base64 -d ; echo
 
 # 4. Tear down (keeps CNPG PVC data)
 ./scripts/helm-undeploy.sh --cluster dev
@@ -49,6 +55,12 @@ kubectl --context kind-dev -n supabase get pods
 # 5. Destroy the kind cluster entirely
 ./scripts/cluster.sh destroy --name dev
 ```
+
+### Domain & /etc/hosts
+
+Each release is reachable at `<release>.supabase.local`. `cloud-provider-kind` assigns a LoadBalancer IP to Traefik inside the `kind` docker network — all releases on the same cluster share that IP. The deploy script resolves it and prints a copy-paste-ready `/etc/hosts` line. Different kind clusters get different LB IPs, so you can run several in parallel, each with its own hosts entry.
+
+> Note: `cloud-provider-kind` only assigns the LoadBalancer IP — it does not port-forward 80/443 to `127.0.0.1`. That is why the hosts file entry points to the docker-network IP directly.
 
 Gateway API mode (alpha): pass `--mode gateway` to `cluster.sh create`; `helm-deploy.sh` auto-detects the edge via installed GatewayClass/IngressClass and flips `ingress.enabled` / `gateway.enabled` accordingly. Override with `EDGE=gateway` or `EDGE=ingress`.
 
@@ -58,7 +70,11 @@ Multi-node: with `--workers N`, kind creates `N` worker nodes labeled round-robi
 
 Full chart documentation is in [`charts/supabase/README.md`](./charts/supabase/README.md). Highlights:
 
-- **Auto-generated credentials** — a pre-install Job mints the full JWT material on first install: HS256 legacy keys (`JWT_SECRET`, `anonKey`, `serviceKey`), ES256 asymmetric keys (`anonKeyAsymmetric`, `serviceKeyAsymmetric`, `jwtKeys`, `jwtJwks`), and opaque `sb_publishable_*` / `sb_secret_*` keys. Bring your own via `secret.jwt.secretRef`.
+- **Auto-generated credentials** — three pre-install Jobs mint everything random on first install, nothing leaves defaulted:
+  - `jwt-generator` — HS256 (`JWT_SECRET`, `anonKey`, `serviceKey`), ES256 (`anonKeyAsymmetric`, `serviceKeyAsymmetric`, `jwtKeys`, `jwtJwks`), opaque `sb_publishable_*` / `sb_secret_*`.
+  - `db-generator` — one random password per Postgres role, stored as `basic-auth` Secrets.
+  - `credentials-generator` — Studio dashboard password, Logflare tokens, S3 keyId/accessKey, Realtime `SECRET_KEY_BASE`, postgres-meta `cryptoKey`, MinIO root password.
+  Idempotent: existing Secrets are never overwritten. Bring-your-own via `secret.<component>.secretRef`. Non-password inline overrides (`dashboard.username`, `dashboard.openAiApiKey`, `minio.user`) still supported.
 - **Per-role DB secrets** — a second pre-install Job creates one `basic-auth` Secret per Postgres role (`postgres`, `authenticator`, `supabase_auth_admin`, …). CNPG and each service read only their own credential.
 - **Kong entrypoint** aligned with the upstream `supabase/supabase` `docker/volumes/api/kong-entrypoint.sh` — honors both legacy `anon`/`service_role` keys and the new asymmetric `SUPABASE_PUBLISHABLE_KEY` / `SUPABASE_SECRET_KEY` pair.
 - **PodDisruptionBudgets** — opt-in per stateless service via `deployment.<svc>.podDisruptionBudget.enabled`. CNPG manages the Postgres PDB itself.

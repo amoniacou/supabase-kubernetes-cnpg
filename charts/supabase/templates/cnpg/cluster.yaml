@@ -57,7 +57,7 @@ spec:
       postInitSQLRefs:
         configMapRefs:
           {{- $cm := include "supabase.db.initdb.fullname" . }}
-          {{- range $key := list "00-init.sql" "01-migrations.sql" "98-webhooks.sql" "99-realtime.sql" }}
+          {{- range $key := list "00-init.sql" "01-migrations.sql" "97-extensions.sql" "98-webhooks.sql" "99-realtime.sql" }}
           - name: {{ $cm }}
             key: {{ $key }}
           {{- end }}

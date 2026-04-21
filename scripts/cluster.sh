@@ -103,6 +103,9 @@ EOF
   done
 
   # Shared cloud-provider-kind container serves LB IPs for ALL kind clusters.
+  # It does NOT port-forward the LB to 127.0.0.1 — services are reachable
+  # through the LB IP in the `kind` docker network. The deploy script prints
+  # an /etc/hosts hint mapping <release>.supabase.local → LB IP.
   # On cluster recreate, the apiserver CA changes — restart CPK so it re-reads
   # kubeconfigs, otherwise LB IP assignment stalls with x509 TLS errors.
   if docker inspect "$CLOUD_PROVIDER_KIND_NAME" >/dev/null 2>&1; then
@@ -198,6 +201,14 @@ EOF
     echo "WARNING: no LB IP yet (cloud-provider-kind may still be syncing)."
   else
     echo "Cluster '$NAME' ready in '$MODE' mode. Traefik LB IP: $lb_ip"
+    cat <<EOF
+
+All Supabase releases on this cluster share the Traefik LB IP above.
+After each 'helm-deploy.sh', add an /etc/hosts line for the release, e.g.:
+
+  $lb_ip  <release>.supabase.local
+
+EOF
   fi
 }
 cmd_validate() {
@@ -239,7 +250,7 @@ cmd_validate() {
 Cluster : $NAME
 Mode    : $detected_mode
 LB IP   : $lb_ip
-Example : http://<release>.local.gd (routed via Traefik LB $lb_ip)
+Example : http://<release>.supabase.local (map to $lb_ip in /etc/hosts)
 EOF
 }
 cmd_destroy() {

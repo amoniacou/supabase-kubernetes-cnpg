@@ -57,7 +57,6 @@ secret:
     ## When set (non-empty), the generator Job is skipped and services read
     ## all keys from this Secret.
     secretRef: ""
-
     ## Map to actual key names inside secretRef if they differ from the
     ## defaults (anonKey, serviceKey, secret, publishableKey, secretKey,
     ## anonKeyAsymmetric, serviceRoleKeyAsymmetric, jwtKeys, jwtJwks).
@@ -66,17 +65,17 @@ secret:
     #   serviceKey: serviceKey
     #   secret: secret
 
-  ## PostgreSQL credentials
-  ##
-  ## A pre-install Job generates one alphanumeric password per Postgres role
-  ## (postgres, supabase_admin, authenticator, pgbouncer, supabase_auth_admin,
-  ## supabase_storage_admin, supabase_functions_admin) and writes each into a
-  ## separate `kubernetes.io/basic-auth` Secret named
-  ## `<release>-db-<role-with-dashes>`. CNPG consumes those directly and the
-  ## Supabase services each read the password of the role they connect as.
-  ## Passwords never rotate once generated — missing Secrets are filled in,
-  ## existing ones are left untouched.
-  ##
+    ## PostgreSQL credentials
+    ##
+    ## A pre-install Job generates one alphanumeric password per Postgres role
+    ## (postgres, supabase_admin, authenticator, pgbouncer, supabase_auth_admin,
+    ## supabase_storage_admin, supabase_functions_admin) and writes each into a
+    ## separate `kubernetes.io/basic-auth` Secret named
+    ## `<release>-db-<role-with-dashes>`. CNPG consumes those directly and the
+    ## Supabase services each read the password of the role they connect as.
+    ## Passwords never rotate once generated — missing Secrets are filled in,
+    ## existing ones are left untouched.
+    ##
   db:
     ## Database name used by CNPG initdb.
     database: "postgres"
@@ -94,116 +93,76 @@ secret:
     #   supabase_storage_admin: ""
     #   supabase_functions_admin: ""
 
-  ## Logflare credentials
-  ##
+    ## All Secrets below are auto-generated on first install by the
+    ## `credentials-generator` pre-install Job. Passwords/tokens are random
+    ## (openssl rand); non-password fields (username, OpenAI key, MinIO user)
+    ## accept optional inline overrides. Existing Secrets are never overwritten
+    ## — delete the Secret to trigger regeneration.
+    ##
+    ## For production bring-your-own, set `<secret>.secretRef` to the name of
+    ## a pre-populated Secret; the generator then skips that entry entirely.
+
+    ## Logflare credentials (publicAccessToken, privateAccessToken) — both random.
   analytics:
-    publicAccessToken: "your-super-secret-and-long-logflare-key-public"
-    privateAccessToken: "your-super-secret-and-long-logflare-key-private"
-
-    ## Reference to existing secret
-    # secretRef: ""
-
-    ## Map to actual keys inside secretRef if they differ
+    secretRef: ""
     # secretRefKey:
     #   publicAccessToken: publicAccessToken
     #   privateAccessToken: privateAccessToken
 
-  ## BigQuery service account credentials
-  ## Used by Logflare when analytics backend is set to BigQuery
-  ##
+    ## BigQuery service account credentials (gcloud.json). Bring-your-own only
+    ## — can't be generated. Leave gcloudJson empty unless BigQuery is enabled.
   bigquery:
     gcloudJson: ""
-
-    ## Reference to existing secret
-    # secretRef: ""
-
-    ## Map to actual keys inside secretRef if they differ
+    secretRef: ""
     # secretRefKey:
     #   gcloudJson: gcloud.json
 
-  ## SMTP credentials
-  ##
+    ## SMTP credentials (username, password). Bring-your-own only — real mail
+    ## server login, can't be generated. Leave empty for no outbound mail.
   smtp:
-    username: "fake_mail_user"
-    password: "fake_mail_password"
-
-    ## Reference to existing secret
-    # secretRef: ""
-
-    ## Map to actual keys inside secretRef if they differ
+    username: ""
+    password: ""
+    secretRef: ""
     # secretRefKey:
     #   username: username
     #   password: password
 
-  ## Studio dashboard credentials
-  ##
+    ## Studio dashboard credentials. `username` defaults to "supabase", `password`
+    ## is random, `openAiApiKey` is optional (for Studio AI features).
   dashboard:
-    username: "supabase"
-    password: "this_password_is_insecure_and_should_be_updated"
-    openAiApiKey: "key_super_secret"
-
-    ## Reference to existing secret
-    # secretRef: ""
-
-    ## Map to actual keys inside secretRef if they differ
+    # username: "supabase"
+    # openAiApiKey: ""
+    secretRef: ""
     # secretRefKey:
     #   username: username
     #   password: password
     #   openAiApiKey: openAiApiKey
 
-  ## S3-compatible credentials
-  ##
+    ## S3-compatible credentials (keyId, accessKey) — both random.
   s3:
-    keyId: "625729a08b95bf1b7ff351a663f3a23c"
-    accessKey: "850181e4652dd023b7a98c58ae0d2d34bd487ee0cc3254aed6eda37307425907"
-
-    ## Reference to existing secret
-    # secretRef: ""
-
-    ## Map to actual keys inside secretRef if they differ
+    secretRef: ""
     # secretRefKey:
     #   keyId: keyId
     #   accessKey: accessKey
 
-  ## Realtime service
-  ## Docs: https://supabase.com/docs/guides/realtime
-  ##
+    ## Realtime service SECRET_KEY_BASE (Phoenix) — random.
+    ## Docs: https://supabase.com/docs/guides/realtime
   realtime:
-    ## Used by Supabase Realtime (Phoenix) to sign and encrypt internal data,
-    ## sessions and tokens. Equivalent to Phoenix SECRET_KEY_BASE.
-    ## Generate with: openssl rand -base64 64
-    secretKeyBase: "UpNVntn3cDxHJpq99YMc1T1AQgQpc8kfYTuRgBiYa15BLrx8etQoXz3gZv1/u2oq"
-
-    ## Reference to existing secret
-    # secretRef: ""
-
-    ## Map to actual keys inside secretRef if they differ
+    secretRef: ""
     # secretRefKey:
     #   secretKeyBase: secretKeyBase
 
-  ## Meta service
-  ## Docs: https://github.com/supabase/postgres-meta
-  ##
+    ## postgres-meta cryptoKey — random.
+    ## Docs: https://github.com/supabase/postgres-meta
   meta:
-    ## Used to encrypt sensitive metadata at rest.
-    ## Generate with: openssl rand -hex 32
-    cryptoKey: "your-encryption-key-32-chars-min"
-
-    ## Reference to existing secret
-    # secretRef: ""
-
-    ## Map to actual keys inside secretRef if they differ
+    secretRef: ""
     # secretRefKey:
     #   cryptoKey: cryptoKey
 
+    ## MinIO root credentials. `user` defaults to "supa-storage", `password` is random.
   minio:
-    user: supa-storage
-    password: secret1234
-
-    ## Reference to existing secret
-    # secretRef: ""
-
-    ## Map to actual keys inside secretRef if they differ
+    # user: "supa-storage"
+    secretRef: ""
     # secretRefKey:
     #   user: user
     #   password: password
@@ -964,8 +923,8 @@ autoscaling:
     targetCPUUtilizationPercentage: 80
     # targetMemoryUtilizationPercentage: 80
 
-## Public hostname for the Kong edge. Used by both the Ingress rule and the
-## Gateway API HTTPRoute. Override per environment.
+    ## Public hostname for the Kong edge. Used by both the Ingress rule and the
+    ## Gateway API HTTPRoute. Override per environment.
 host: supabase.local
 
 ## Gateway API HTTPRoute toggle (alternative to Ingress — alpha).
@@ -1082,7 +1041,6 @@ bigQuery:
   projectId: google-project-id
   projectNumber: google-project-number
 
-
 ## =============================================================================
 ## CLOUDNATIVEPG — HA PostgreSQL via CloudNativePG operator
 ## =============================================================================
@@ -1127,9 +1085,36 @@ cnpg:
       cpu: "2"
       memory: 4Gi
 
-  ## PostgreSQL configuration overrides
+  ## PostgreSQL configuration overrides. Mirrors the working Supabase/CNPG
+  ## reference config: Supabase-specific extensions (pg_net, pg_cron, pgaudit,
+  ## supautils, …) are declared in shared_preload_libraries so they can be
+  ## enabled via CREATE EXTENSION without restarting the cluster.
   postgresql:
     parameters:
       shared_buffers: "256MB"
       max_connections: "200"
       effective_cache_size: "1GB"
+      work_mem: "4MB"
+      maintenance_work_mem: "64MB"
+      wal_level: "logical"
+      max_wal_senders: "10"
+      max_replication_slots: "10"
+      track_activities: "on"
+      track_counts: "on"
+      track_io_timing: "on"
+      track_functions: "all"
+      cron.database_name: "postgres"
+    ## supabase/postgres docker default set + pg_stat_monitor + supautils.
+    shared_preload_libraries:
+      - "pg_stat_statements"
+      # - "pg_stat_monitor"
+      - "pgaudit"
+      - "plpgsql"
+      - "plpgsql_check"
+      - "pg_cron"
+      - "pg_net"
+      - "auto_explain"
+      - "pg_tle"
+      - "plan_filter"
+      # - "supabase_vault"
+      - "supautils"
