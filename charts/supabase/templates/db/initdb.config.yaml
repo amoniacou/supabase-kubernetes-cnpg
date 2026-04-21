@@ -1,52 +1,24 @@
-{{- if .Values.deployment.db.enabled -}}
+{{- if .Values.cnpg.enabled -}}
 kind: ConfigMap
 apiVersion: v1
 metadata:
-  name: {{ include "supabase.db.fullname" . }}-initdb
+  name: {{ include "supabase.db.initdb.fullname" . }}
   labels:
     {{- include "supabase.labels" . | nindent 4 }}
 data:
-  99-jwt.sql: |
-    \set jwt_secret `echo "$JWT_SECRET"`
-    \set jwt_exp `echo "$JWT_EXP"`
-
-    ALTER DATABASE postgres SET "app.settings.jwt_secret" TO :'jwt_secret';
-    ALTER DATABASE postgres SET "app.settings.jwt_exp" TO :'jwt_exp';
-  99-pooler.sql: |
-    \set pguser `echo "$POSTGRES_USER"`
-
-    \c _supabase
-    create schema if not exists _supavisor;
-    alter schema _supavisor owner to :pguser;
-    \c postgres
-  99-logs.sql: |
-    \set pguser `echo "$POSTGRES_USER"`
-    \c _supabase
-    create schema if not exists _analytics;
-    alter schema _analytics owner to :pguser;
-    \c postgres
+  # Upstream baseline from supabase/postgres, vendored via
+  # scripts/fetch-db-init.sh against Chart.yaml appVersion. CNPG does not
+  # invoke the image's docker-entrypoint, so these replace the
+  # /docker-entrypoint-initdb.d/ scripts the image would normally run.
+  00-init.sql: |
+{{ .Files.Get "files/db/init.sql" | indent 4 }}
+  01-migrations.sql: |
+{{ .Files.Get "files/db/migrations.sql" | indent 4 }}
   99-realtime.sql: |
-    \set pguser `echo "$POSTGRES_USER"`
-
-    create schema if not exists _realtime;
-    alter schema _realtime owner to :pguser;
-  99-roles.sql: |
-    -- NOTE: change to your own passwords for production environments
-    \set pgpass `echo "$POSTGRES_PASSWORD"`
-
-    ALTER USER authenticator WITH PASSWORD :'pgpass';
-    ALTER USER pgbouncer WITH PASSWORD :'pgpass';
-    ALTER USER supabase_auth_admin WITH PASSWORD :'pgpass';
-    ALTER USER supabase_functions_admin WITH PASSWORD :'pgpass';
-    ALTER USER supabase_storage_admin WITH PASSWORD :'pgpass';
-  97-_supabase.sql: |
-    \set pguser `echo "$POSTGRES_USER"`
-
-    CREATE DATABASE _supabase WITH OWNER :pguser;
+    CREATE SCHEMA IF NOT EXISTS _realtime;
+    ALTER SCHEMA _realtime OWNER TO supabase_admin;
   98-webhooks.sql: |
     BEGIN;
-      -- Create pg_net extension
-      CREATE EXTENSION IF NOT EXISTS pg_net SCHEMA extensions;
       -- Create supabase_functions schema
       CREATE SCHEMA supabase_functions AUTHORIZATION supabase_admin;
       GRANT USAGE ON SCHEMA supabase_functions TO postgres, anon, authenticated, service_role;

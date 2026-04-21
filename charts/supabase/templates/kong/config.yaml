@@ -1,4 +1,11 @@
 {{- if .Values.deployment.kong.enabled -}}
+{{- $authSvc     := printf "http://%s:%d" (include "supabase.auth.fullname" .)     (int .Values.service.auth.port)     -}}
+{{- $restSvc     := printf "http://%s:%d" (include "supabase.rest.fullname" .)     (int .Values.service.rest.port)     -}}
+{{- $realtimeSvc := printf "http://%s:%d" (include "supabase.realtime.fullname" .) (int .Values.service.realtime.port) -}}
+{{- $storageSvc  := printf "http://%s:%d" (include "supabase.storage.fullname" .)  (int .Values.service.storage.port)  -}}
+{{- $functionsSvc := printf "http://%s:%d" (include "supabase.functions.fullname" .) (int .Values.service.functions.port) -}}
+{{- $metaSvc     := printf "http://%s:%d" (include "supabase.meta.fullname" .)     (int .Values.service.meta.port)     -}}
+{{- $studioSvc   := printf "http://%s:%d" (include "supabase.studio.fullname" .)   (int .Values.service.studio.port)   -}}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -6,10 +13,13 @@ metadata:
   labels:
     {{- include "supabase.labels" . | nindent 4 }}
 data:
-  wrapper.sh: |
+  # Mirrors docker/volumes/api/kong-entrypoint.sh from the supabase/supabase
+  # repo: builds Lua expressions for the Authorization/x-api-key rewrites and
+  # substitutes env vars into temp.yml with awk (sed/eval would strip YAML
+  # quoting and break "Header: value" mappings).
+  kong-entrypoint.sh: |
     #!/bin/bash
-
-    set -euo pipefail
+    set -eu
 
     if [ -n "${SUPABASE_SECRET_KEY:-}" ] && [ -n "${SUPABASE_PUBLISHABLE_KEY:-}" ]; then
       export LUA_AUTH_EXPR="\$((headers.authorization ~= nil and headers.authorization:sub(1, 10) ~= 'Bearer sb_' and headers.authorization) or (headers.apikey == '${SUPABASE_SECRET_KEY}' and 'Bearer ${SERVICE_ROLE_KEY_ASYMMETRIC}') or (headers.apikey == '${SUPABASE_PUBLISHABLE_KEY}' and 'Bearer ${ANON_KEY_ASYMMETRIC}') or headers.apikey)"
@@ -19,26 +29,27 @@ data:
       export LUA_RT_WS_EXPR="\$(query_params.apikey)"
     fi
 
-    echo "Replacing env placeholders of /usr/local/kong/kong.yml"
+    awk '{
+      result = ""
+      rest = $0
+      while (match(rest, /\$[A-Za-z_][A-Za-z_0-9]*/)) {
+        varname = substr(rest, RSTART + 1, RLENGTH - 1)
+        if (varname in ENVIRON) {
+          result = result substr(rest, 1, RSTART - 1) ENVIRON[varname]
+        } else {
+          result = result substr(rest, 1, RSTART + RLENGTH - 1)
+        }
+        rest = substr(rest, RSTART + RLENGTH)
+      }
+      print result rest
+    }' /home/kong/temp.yml > "$KONG_DECLARATIVE_CONFIG"
 
-    sed \
-    -e "s|\${SUPABASE_ANON_KEY}|${SUPABASE_ANON_KEY}|" \
-    -e "s|\${SUPABASE_SERVICE_KEY}|${SUPABASE_SERVICE_KEY}|" \
-    -e "s|\${SUPABASE_PUBLISHABLE_KEY}|${SUPABASE_PUBLISHABLE_KEY:-}|" \
-    -e "s|\${SUPABASE_SECRET_KEY}|${SUPABASE_SECRET_KEY:-}|" \
-    -e "s|\${ANON_KEY_ASYMMETRIC}|${ANON_KEY_ASYMMETRIC:-}|" \
-    -e "s|\${SERVICE_ROLE_KEY_ASYMMETRIC}|${SERVICE_ROLE_KEY_ASYMMETRIC:-}|" \
-    -e "s|\${LUA_AUTH_EXPR}|${LUA_AUTH_EXPR}|" \
-    -e "s|\${LUA_RT_WS_EXPR}|${LUA_RT_WS_EXPR}|" \
-    -e "s|\${DASHBOARD_USERNAME}|${DASHBOARD_USERNAME}|" \
-    -e "s|\${DASHBOARD_PASSWORD}|${DASHBOARD_PASSWORD}|" \
-    /usr/local/kong/template.yml \
-    > /usr/local/kong/kong.yml
-
-    sed -i '/^[[:space:]]*- key:[[:space:]]*$/d' /usr/local/kong/kong.yml
+    # Drop any key-auth credentials entries whose key substituted to empty
+    # (unconfigured opaque keys).
+    sed -i '/^[[:space:]]*- key:[[:space:]]*$/d' "$KONG_DECLARATIVE_CONFIG"
 
     exec /entrypoint.sh kong docker-start
-  template.yml: |
+  temp.yml: |
     _format_version: '2.1'
     _transform: true
 
@@ -48,27 +59,31 @@ data:
     {{- end }}
       - username: anon
         keyauth_credentials:
-            - key: ${SUPABASE_ANON_KEY}
-            - key: ${SUPABASE_PUBLISHABLE_KEY}
+          - key: $SUPABASE_ANON_KEY
+          - key: $SUPABASE_PUBLISHABLE_KEY
       - username: service_role
         keyauth_credentials:
-            - key: ${SUPABASE_SERVICE_KEY}
-            - key: ${SUPABASE_SECRET_KEY}
+          - key: $SUPABASE_SERVICE_KEY
+          - key: $SUPABASE_SECRET_KEY
+
     acls:
       - consumer: anon
         group: anon
       - consumer: service_role
         group: admin
+
     {{- if .Values.secret.dashboard }}
     basicauth_credentials:
       - consumer: DASHBOARD
-        username: '${DASHBOARD_USERNAME}'
-        password: '${DASHBOARD_PASSWORD}'
+        username: '$DASHBOARD_USERNAME'
+        password: '$DASHBOARD_PASSWORD'
     {{- end }}
+
     services:
     {{- if .Values.deployment.auth.enabled }}
+      ## Open Auth routes
       - name: auth-v1-open
-        url: http://{{ include "supabase.auth.fullname" . }}:{{ .Values.service.auth.port }}/verify
+        url: {{ $authSvc }}/verify
         routes:
           - name: auth-v1-open
             strip_path: true
@@ -77,7 +92,7 @@ data:
         plugins:
           - name: cors
       - name: auth-v1-open-callback
-        url: http://{{ include "supabase.auth.fullname" . }}:{{ .Values.service.auth.port }}/callback
+        url: {{ $authSvc }}/callback
         routes:
           - name: auth-v1-open-callback
             strip_path: true
@@ -86,7 +101,7 @@ data:
         plugins:
           - name: cors
       - name: auth-v1-open-authorize
-        url: http://{{ include "supabase.auth.fullname" . }}:{{ .Values.service.auth.port }}/authorize
+        url: {{ $authSvc }}/authorize
         routes:
           - name: auth-v1-open-authorize
             strip_path: true
@@ -95,7 +110,7 @@ data:
         plugins:
           - name: cors
       - name: auth-v1-open-jwks
-        url: http://{{ include "supabase.auth.fullname" . }}:{{ .Values.service.auth.port }}/.well-known/jwks.json
+        url: {{ $authSvc }}/.well-known/jwks.json
         routes:
           - name: auth-v1-open-jwks
             strip_path: true
@@ -103,38 +118,28 @@ data:
               - /auth/v1/.well-known/jwks.json
         plugins:
           - name: cors
-      - name: well-known-oauth
-        _comment: 'Auth: /.well-known/oauth-authorization-server -> http://{{ include "supabase.auth.fullname" . }}:{{ .Values.service.auth.port }}/.well-known/oauth-authorization-server'
-        url: http://{{ include "supabase.auth.fullname" . }}:{{ .Values.service.auth.port }}/.well-known/oauth-authorization-server
-        routes:
-          - name: well-known-oauth
-            strip_path: true
-            paths:
-              - /.well-known/oauth-authorization-server
-        plugins:
-          - name: cors
-          
       - name: auth-v1-open-sso-acs
-        url: "http://auth:9999/sso/saml/acs"
+        url: {{ $authSvc }}/sso/saml/acs
         routes:
           - name: auth-v1-open-sso-acs
             strip_path: true
             paths:
-            - /sso/saml/acs
+              - /sso/saml/acs
         plugins:
           - name: cors
       - name: auth-v1-open-sso-metadata
-        url: "http://auth:9999/sso/saml/metadata"
+        url: {{ $authSvc }}/sso/saml/metadata
         routes:
           - name: auth-v1-open-sso-metadata
             strip_path: true
             paths:
-            - /sso/saml/metadata
+              - /sso/saml/metadata
         plugins:
           - name: cors
+
+      ## Secure Auth routes
       - name: auth-v1
-        _comment: "GoTrue: /auth/v1/* -> http://{{ include "supabase.auth.fullname" . }}:{{ .Values.service.auth.port }}/*"
-        url: http://{{ include "supabase.auth.fullname" . }}:{{ .Values.service.auth.port }}
+        url: {{ $authSvc }}/
         routes:
           - name: auth-v1-all
             strip_path: true
@@ -149,21 +154,33 @@ data:
             config:
               add:
                 headers:
-                  - "Authorization: ${LUA_AUTH_EXPR}"
+                  - "Authorization: $LUA_AUTH_EXPR"
               replace:
                 headers:
-                  - "Authorization: ${LUA_AUTH_EXPR}"
+                  - "Authorization: $LUA_AUTH_EXPR"
           - name: acl
             config:
               hide_groups_header: true
               allow:
                 - admin
                 - anon
+
+      ## OAuth 2.0 Authorization Server Metadata (RFC 8414)
+      - name: well-known-oauth
+        url: {{ $authSvc }}/.well-known/oauth-authorization-server
+        routes:
+          - name: well-known-oauth
+            strip_path: true
+            paths:
+              - /.well-known/oauth-authorization-server
+        plugins:
+          - name: cors
     {{- end }}
+
     {{- if .Values.deployment.rest.enabled }}
+      ## Secure PostgREST routes
       - name: rest-v1
-        _comment: "PostgREST: /rest/v1/* -> http://{{ include "supabase.rest.fullname" . }}:{{ .Values.service.rest.port }}/*"
-        url: http://{{ include "supabase.rest.fullname" . }}:{{ .Values.service.rest.port }}/
+        url: {{ $restSvc }}/
         routes:
           - name: rest-v1-all
             strip_path: true
@@ -178,19 +195,20 @@ data:
             config:
               add:
                 headers:
-                  - "Authorization: ${LUA_AUTH_EXPR}"
+                  - "Authorization: $LUA_AUTH_EXPR"
               replace:
                 headers:
-                  - "Authorization: ${LUA_AUTH_EXPR}"
+                  - "Authorization: $LUA_AUTH_EXPR"
           - name: acl
             config:
               hide_groups_header: true
               allow:
                 - admin
                 - anon
+
+      ## Secure GraphQL routes
       - name: graphql-v1
-        _comment: 'PostgREST: /graphql/v1/* -> http://{{ include "supabase.rest.fullname" . }}:{{ .Values.service.rest.port }}/rpc/graphql'
-        url: http://{{ include "supabase.rest.fullname" . }}:{{ .Values.service.rest.port }}/rpc/graphql
+        url: {{ $restSvc }}/rpc/graphql
         routes:
           - name: graphql-v1-all
             strip_path: true
@@ -206,10 +224,10 @@ data:
               add:
                 headers:
                   - "Content-Profile: graphql_public"
-                  - "Authorization: ${LUA_AUTH_EXPR}"
+                  - "Authorization: $LUA_AUTH_EXPR"
               replace:
                 headers:
-                  - "Authorization: ${LUA_AUTH_EXPR}"
+                  - "Authorization: $LUA_AUTH_EXPR"
           - name: acl
             config:
               hide_groups_header: true
@@ -217,10 +235,11 @@ data:
                 - admin
                 - anon
     {{- end }}
+
     {{- if .Values.deployment.realtime.enabled }}
+      ## Secure Realtime routes
       - name: realtime-v1-ws
-        _comment: "Realtime: /realtime/v1/* -> ws://{{ include "supabase.realtime.fullname" . }}:{{ .Values.service.realtime.port }}/socket/*"
-        url: http://{{ include "supabase.realtime.fullname" . }}:{{ .Values.service.realtime.port }}/socket
+        url: {{ $realtimeSvc }}/socket
         protocol: ws
         routes:
           - name: realtime-v1-ws
@@ -236,10 +255,10 @@ data:
             config:
               add:
                 headers:
-                  - "x-api-key:${LUA_RT_WS_EXPR}"
+                  - "x-api-key: $LUA_RT_WS_EXPR"
               replace:
                 querystring:
-                  - "apikey:${LUA_RT_WS_EXPR}"
+                  - "apikey: $LUA_RT_WS_EXPR"
           - name: acl
             config:
               hide_groups_header: true
@@ -247,8 +266,7 @@ data:
                 - admin
                 - anon
       - name: realtime-v1-rest
-        _comment: 'Realtime: /realtime/v1/* -> http://{{ include "supabase.realtime.fullname" . }}:{{ .Values.service.realtime.port }}/api/*'
-        url: http://{{ include "supabase.realtime.fullname" . }}:{{ .Values.service.realtime.port }}/api
+        url: {{ $realtimeSvc }}/api
         protocol: http
         routes:
           - name: realtime-v1-rest
@@ -264,10 +282,10 @@ data:
             config:
               add:
                 headers:
-                  - "Authorization: ${LUA_AUTH_EXPR}"
+                  - "Authorization: $LUA_AUTH_EXPR"
               replace:
                 headers:
-                  - "Authorization: ${LUA_AUTH_EXPR}"
+                  - "Authorization: $LUA_AUTH_EXPR"
           - name: acl
             config:
               hide_groups_header: true
@@ -275,10 +293,14 @@ data:
                 - admin
                 - anon
     {{- end }}
+
     {{- if .Values.deployment.storage.enabled }}
+      ## Storage API (no key-auth — S3 protocol requests use SigV4 instead).
+      ## request-transformer translates opaque keys; post-function strips the
+      ## Authorization header if the Lua expr evaluated to empty, so S3
+      ## presigned URL signature validation falls through to query params.
       - name: storage-v1
-        _comment: "Storage: /storage/v1/* -> http://{{ include "supabase.storage.fullname" . }}:{{ .Values.service.storage.port }}/*"
-        url: http://{{ include "supabase.storage.fullname" . }}:{{ .Values.service.storage.port }}/
+        url: {{ $storageSvc }}/
         routes:
           - name: storage-v1-all
             strip_path: true
@@ -290,10 +312,10 @@ data:
             config:
               add:
                 headers:
-                  - "Authorization: ${LUA_AUTH_EXPR}"
+                  - "Authorization: $LUA_AUTH_EXPR"
               replace:
                 headers:
-                  - "Authorization: ${LUA_AUTH_EXPR}"
+                  - "Authorization: $LUA_AUTH_EXPR"
           - name: post-function
             config:
               access:
@@ -303,10 +325,11 @@ data:
                     kong.service.request.clear_header("authorization")
                   end
     {{- end }}
+
     {{- if .Values.deployment.functions.enabled }}
+      ## Edge Functions routes
       - name: functions-v1
-        _comment: 'Edge Functions: /functions/v1/* -> http://{{ include "supabase.functions.fullname" . }}:{{ .Values.service.functions.port }}/*'
-        url: http://{{ include "supabase.functions.fullname" . }}:{{ .Values.service.functions.port }}/
+        url: {{ $functionsSvc }}/
         read_timeout: 150000
         routes:
           - name: functions-v1-all
@@ -316,29 +339,11 @@ data:
         plugins:
           - name: cors
     {{- end }}
-    
-    {{/*
-    ## Not used - Studio and Vector talk directly to analytics via Docker networking.
-    ## If external access is needed, add routes with key-auth matching Logflare's x-api-key auth.
-    */}}
-    
-    {{/*
-    {{- if .Values.deployment.analytics.enabled }}
-      - name: analytics-v1
-        _comment: 'Analytics: /analytics/v1/* -> http://{{ include "supabase.analytics.fullname" . }}:{{ .Values.service.analytics.port }}/*'
-        url: http://{{ include "supabase.analytics.fullname" . }}:{{ .Values.service.analytics.port }}/
-        routes:
-          - name: analytics-v1-all
-            strip_path: true
-            paths:
-              - /analytics/v1/
-    {{- end }}
-    */}}
-    
+
     {{- if .Values.deployment.meta.enabled }}
+      ## Secure pg-meta route
       - name: meta
-        _comment: "pg-meta: /pg/* -> http://{{ include "supabase.meta.fullname" . }}:{{ .Values.service.meta.port }}/*"
-        url: http://{{ include "supabase.meta.fullname" . }}:{{ .Values.service.meta.port }}/
+        url: {{ $metaSvc }}/
         routes:
           - name: meta-all
             strip_path: true
@@ -354,19 +359,47 @@ data:
               allow:
                 - admin
     {{- end }}
+
+      ## Block direct access to /api/mcp (upstream default; enable explicitly
+      ## by replacing the request-termination plugin with cors + ip-restriction).
+      - name: mcp-blocker
+        url: {{ $studioSvc }}/api/mcp
+        routes:
+          - name: mcp-blocker-route
+            strip_path: true
+            paths:
+              - /api/mcp
+        plugins:
+          - name: request-termination
+            config:
+              status_code: 403
+              message: "Access is forbidden."
+      - name: mcp
+        url: {{ $studioSvc }}/api/mcp
+        routes:
+          - name: mcp
+            strip_path: true
+            paths:
+              - /mcp
+        plugins:
+          - name: request-termination
+            config:
+              status_code: 403
+              message: "Access is forbidden."
+
+      ## Protected Dashboard - catch all remaining routes
       - name: dashboard
-        _comment: 'Studio: /* -> http://{{ include "supabase.studio.fullname" . }}:{{ .Values.service.studio.port }}/*'
-        url: http://{{ include "supabase.studio.fullname" . }}:{{ .Values.service.studio.port }}/
+        url: {{ $studioSvc }}/
         routes:
           - name: dashboard-all
             strip_path: true
             paths:
               - /
-    {{- if .Values.secret.dashboard }}
         plugins:
           - name: cors
+          {{- if .Values.secret.dashboard }}
           - name: basic-auth
             config:
               hide_credentials: true
-    {{- end }}
+          {{- end }}
 {{- end }}

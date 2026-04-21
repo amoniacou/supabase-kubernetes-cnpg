@@ -1,14 +1,15 @@
-# Supabase for Kubernetes with Helm
+# Supabase for Kubernetes with Helm (CNPG variant)
 
 This directory contains the configurations and scripts required to run Supabase inside a Kubernetes cluster.
 
-## Disclamer
+This is an **opinionated fork** of [supabase-community/supabase-kubernetes](https://github.com/supabase-community/supabase-kubernetes): the single-pod Postgres StatefulSet from the upstream chart is replaced with a [CloudNativePG](https://cloudnative-pg.io/) (CNPG) `Cluster`. The StatefulSet path, the external-DB init Job, and the community `db.*` values are not supported and have been removed from this chart. If you need one of those, use the upstream chart.
 
-We use [supabase/postgres](https://hub.docker.com/r/supabase/postgres) to create and manage the Postgres database. This permit you to use replication if needed but you'll have to use the Postgres image provided Supabase or build your own on top of it. You can also choose to use other databases provider like [StackGres](https://stackgres.io/) or [Postgres Operator](https://github.com/zalando/postgres-operator).
+## Prerequisites
 
-For the moment we are using a root container to permit the installation of the missing `pgjwt` and `wal2json` extension inside the `initdbScripts`. This is considered a security issue, but you can use your own Postgres image instead with the extension already installed to prevent this. We provide an example of `Dockerfile`for this purpose, you can use [ours](https://hub.docker.com/r/tdeoliv/supabase-bitnami-postgres) or build and host it on your own.
+- A Kubernetes cluster with the **CloudNativePG operator pre-installed**, **version ≥ 1.28.2** — earlier versions are missing CRD fields the chart relies on. This chart only ships the `Cluster` and `Database` CRs, not the operator.
+- The `supabase/postgres` image matching `Chart.yaml` `appVersion` (currently `17.6.1.108`). The CNPG cluster pulls it automatically; override via `cnpg.image.tag` if needed.
 
-The database configuration we provide is an example using only one master. If you want to go to production, we highly recommend you to use a replicated database.
+For production: run more than one CNPG instance (`cnpg.instances: 3`) and wire up a backup `ObjectStore` (Barman-cloud plugin).
 
 ## Usage example
 
@@ -23,27 +24,27 @@ The database configuration we provide is an example using only one master. If yo
     echo "$(minikube ip)     supabase.local" | sudo tee -a /etc/hosts > /dev/null
     ```
 
-2. Add the Supabase Helm repository:
+2. Install the CloudNativePG operator (one-time, cluster-wide; version **≥ 1.28.2**):
 
     ```bash
-    helm repo add supabase https://supabase-community.github.io/supabase-kubernetes
+    kubectl apply --server-side -f \
+      https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/main/releases/cnpg-1.28.2.yaml
     ```
-  
-3. Install Supabase:
+
+3. Install Supabase from this chart:
 
     ```bash
-    helm install demo supabase/supabase
+    helm install demo ./charts/supabase
     ```
 
-4. The first deployment can take some time to complete (especially auth service). You can view the status of the pods using:
+4. The first deployment takes a few minutes (CNPG bootstrap, jwt-generator Job, service pulls). You can view the status of the pods using:
 
     ```bash
     kubectl get pod -l app.kubernetes.io/instance=demo
-    
+
     NAME                                      READY   STATUS    RESTARTS      AGE
     demo-supabase-analytics-xxxxxxxxxx-xxxxx  1/1     Running   0             47s
     demo-supabase-auth-xxxxxxxxxx-xxxxx       1/1     Running   0             47s
-    demo-supabase-db-0-xxxxxxxxxx-xxxxx       1/1     Running   0             47s
     demo-supabase-functions-xxxxxxxxxx-xxxxx  1/1     Running   0             47s
     demo-supabase-imgproxy-xxxxxxxxxx-xxxxx   1/1     Running   0             47s
     demo-supabase-kong-xxxxxxxxxx-xxxxx       1/1     Running   0             47s
@@ -53,6 +54,15 @@ The database configuration we provide is an example using only one master. If yo
     demo-supabase-storage-xxxxxxxxxx-xxxxx    1/1     Running   0             47s
     demo-supabase-studio-xxxxxxxxxx-xxxxx     1/1     Running   0             47s
     demo-supabase-vector-xxxxxxxxxx-xxxxx     1/1     Running   0             47s
+    ```
+
+   The Postgres pods are managed by CNPG and carry `cnpg.io/cluster=<cnpg.clusterName>` labels instead:
+
+    ```bash
+    kubectl get pod -l cnpg.io/cluster=supabase-db
+
+    NAME            READY   STATUS    RESTARTS   AGE
+    supabase-db-1   1/1     Running   0          47s
     ```
 
 5. Open Supabase Studio in your browser: http://supabase.local
@@ -85,18 +95,29 @@ If you want to use mail, consider to adjust the following values in `values.yaml
 
 ### JWT Secret
 
-We encourage you to use your own JWT keys by generating a new Kubernetes secret and reference it in `values.yaml`:
+By default (`secret.jwt.generate: true`) a **pre-install Job** mints a fresh `JWT_SECRET`, `ANON_KEY`, and `SERVICE_ROLE_KEY` (HS256-signed JWTs) and writes them to `<release>-supabase-jwt`. This mirrors the [`generate-keys.sh`](https://supabase.com/docs/guides/self-hosting/docker#generate-and-configure-api-keys) step from the Docker setup guide. The Job is idempotent — the Secret is populated only on the first install; subsequent upgrades reuse the existing values.
+
+To bring your own keys instead, either:
 
 ```yaml
+# Inline (only for local dev)
 secret:
   jwt:
+    generate: false
     anonKey: <new-anon-jwt>
     serviceKey: <new-service-role-jwt>
     secret: <jwt-secret>
 ```
 
-> 32 characters long secret can be generated with `openssl rand 64 | base64`
-> You can use the [JWT Tool](https://supabase.com/docs/guides/self-hosting/docker#generate-and-configure-api-keys) to generate anon and service keys.
+```yaml
+# Pre-created Secret
+secret:
+  jwt:
+    generate: false
+    secretRef: my-supabase-jwt
+```
+
+The 32+ character shared `secret` can be generated with `openssl rand -base64 48`. For asymmetric (publishable / secret key) material, populate `secret.apikey.*` — see [self-hosted auth keys docs](https://supabase.com/docs/guides/self-hosting/self-hosted-auth-keys).
 
 ### SMTP Secret
 
@@ -109,20 +130,35 @@ secret:
     password: <your-smtp-password>
 ```
 
-### DB Secret
+### DB Secrets (per-role)
 
-DB credentials will also be stored in a Kubernetes secret and referenced in `values.yaml`:
+Unlike the upstream chart, this fork does **not** use a single `postgres` password. A pre-install Job (`db-generator`) mints one random password per Postgres role and stores each one in its own `kubernetes.io/basic-auth` Secret named `<release>-db-<role-with-dashes>`. CNPG consumes those directly (`superuserSecret` + `managed.roles[*].passwordSecret`) and the Supabase services each read the password of the role they authenticate as.
+
+Roles provisioned:
+
+```
+postgres
+supabase_admin
+authenticator
+pgbouncer
+supabase_auth_admin
+supabase_storage_admin
+supabase_functions_admin
+```
+
+To bring your own credentials for any role, pre-create a basic-auth Secret with keys `username` (= role name) and `password`, then reference it:
 
 ```yaml
 secret:
   db:
-    password: <db-password>
-    database: <supabase-database-name>
+    database: postgres
+    existingSecrets:
+      postgres: my-postgres-secret
+      authenticator: my-authenticator-secret
+      # Unlisted roles are still generated by the Job.
 ```
 
-The secret can be created with kubectl via command-line:
-
-> If you depend on database providers like [StackGres](https://stackgres.io/), [Postgres Operator](https://github.com/zalando/postgres-operator) or self-hosted Postgres instance, fill in the secret above and modify any relevant Postgres attributes such as port or hostname (e.g. `PGPORT`, `DB_HOST`) for any relevant deployments. Refer to [values.yaml](values.yaml) for more details.
+Passwords never rotate once generated — missing Secrets are filled in on the next upgrade, existing ones are left untouched.
 
 ### Dashboard secret
 
@@ -148,11 +184,13 @@ secret:
 
 ### BigQuery secret
 
-When using BigQuery as analytics backend, provide a GCP service account JSON key via secret values:
+When using BigQuery as the Logflare analytics backend, provide a GCP service account JSON key via secret values:
 
 ```yaml
 bigQuery:
   enabled: true
+  projectId: my-gcp-project
+  projectNumber: "123456789"
 
 secret:
   bigquery:
@@ -199,71 +237,84 @@ Supabase storage supports the use of S3 object-storage. To enable S3 for Supabas
 
 ## How to use in Production
 
-We didn't provide a complete configuration to go production because of the multiple possibility.
+Important points to consider:
 
-But here are the important points you have to think about:
+- Run `cnpg.instances: 3` (primary + 2 standbys) for HA.
+- Configure a backup `ObjectStore` (barman-cloud plugin) — this chart does not ship one.
+- Add SSL to the Postgres cluster via CNPG's [TLS configuration](https://cloudnative-pg.io/documentation/current/certificates/).
+- Add SSL to the Ingress endpoint via `cert-manager` or a LoadBalancer provider.
+- Change the domain in `host:` to your real one.
+- Generate fresh JWT material on install (the default `secret.jwt.generate: true` already does this), or bring your own via `secret.jwt.secretRef`.
+- Override `secret.*` with `secretRef` for every block containing credentials — do not leave the inline defaults in production.
 
-- Use a replicated version of the Postgres database.
-- Add SSL to the Postgres database.
-- Add SSL configuration to the ingresses endpoints using either the `cert-manager` or a LoadBalancer provider.
-- Change the domain used in the ingresses endpoints.
-- Generate a new secure JWT Secret.
+## Database bootstrap
 
-### Migration
+CNPG runs `initdb` itself, so the `supabase/postgres` image's `docker-entrypoint-initdb.d/` scripts never execute — the baseline schemas, roles, and dbmate migrations that the image would normally apply are missing. The chart replays them via CNPG `bootstrap.initdb.postInitSQLRefs`.
 
-Migration from local development is made easy by adding migration scripts at `db.config` field. This will apply all of the migration scripts during the database initialization. For example:
+The SQL is vendored under `files/db/`:
 
-```yaml
-db:
-  config:
-    20230101000000_profiles.sql: |
-      create table profiles (
-        id uuid references auth.users not null,
-        updated_at timestamp with time zone,
-        username text unique,
-        avatar_url text,
-        website text,
+| File | Source | Loaded as |
+|------|--------|-----------|
+| `init.sql` | `supabase/postgres/migrations/db/init-scripts/*.sql` | ConfigMap key `00-init.sql` |
+| `migrations.sql` | `supabase/postgres/migrations/db/migrations/*.sql` | ConfigMap key `01-migrations.sql` |
 
-        primary key (id),
-        unique(username),
-        constraint username_length check (char_length(username) >= 3)
-      );
-```
-
-To make copying scripts easier, use this handy bash script:
+Both files are regenerated by `scripts/fetch-db-init.sh` (repo root, not inside the chart):
 
 ```bash
-#!/bin/bash
+# Fetch for the current Chart.yaml appVersion
+./scripts/fetch-db-init.sh
 
-for file in $1/*; do
-  clipboard+="    $(basename $file): |\n"
-  clipboard+=$(cat $file | awk '{print "      "$0}')
-  clipboard+="\n"
-done
-
-echo -e "$clipboard"
+# Or pin a specific supabase/postgres release tag
+./scripts/fetch-db-init.sh 17.6.1.108
 ```
 
-and pipe it to your system clipboard handler:
+**Rerun after every `Chart.yaml` `appVersion` bump** and commit the regenerated files.
 
-```shell
-# Using xclip as an example
-./script.sh supabase/migrations | xclip -sel clipboard
+### Skipped migrations
+
+Some upstream migrations assume state the chart does not ship and are skipped (see `SKIP_MIGRATIONS` in `fetch-db-init.sh`):
+
+- `10000000000000_demote-postgres` — strips SUPERUSER/BYPASSRLS from the `postgres` role; CNPG uses that role as the app superuser and can no longer reconcile `managed.roles` after it runs.
+- `*_pgbouncer*` (three files) — reference a `pgbouncer` schema the base image pre-creates out-of-band. We do not ship that setup.
+
+## Gateway API (alpha)
+
+As an alternative to the Ingress resource, the chart can emit a Gateway API `HTTPRoute` pointing at Kong. This is **alpha** — CRDs must be pre-installed and a `Gateway` must exist in the cluster:
+
+```yaml
+ingress:
+  enabled: false
+gateway:
+  enabled: true
+  parentRefs:
+    - name: my-gateway
+      namespace: gateway-system
+      sectionName: https
 ```
+
+`host:` at the top level is used for both the Ingress rule and the HTTPRoute `hostnames`.
 
 ## Troubleshooting
 
 ### Ingress Controller and Ingress Class
 
-Depending on your Kubernetes version you might want to fill the `className` property instead of the `kubernetes.io/ingress.class` annotations. For example:
+The default `ingress.className: ""` delegates to the cluster's default IngressClass. Set `className` explicitly for nginx / AGIC / Traefik, and add any controller-specific annotations:
 
-```yml
-kong:
-  ingress:
-    enabled: 'true'
-    className: "nginx"
-    annotations:
-      nginx.ingress.kubernetes.io/rewrite-target: /
+```yaml
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+```
+
+Kong's `/auth/v1/*` endpoints return 401 on unauthenticated health probes. For AGIC, this must be allow-listed so the backend is marked healthy:
+
+```yaml
+ingress:
+  className: azure-application-gateway
+  annotations:
+    appgw.ingress.kubernetes.io/health-probe-status-codes: "200-499"
 ```
 
 ### Testing suite
@@ -287,14 +338,10 @@ docker run -it \
   ct install --chart-dirs . --charts .
 ```
 
-### Version compatibility
+### CNPG cluster not bootstrapping
 
-#### `0.0.x` to `0.1.x`
+If the `supabase-db-1` pod stays in `Pending` or the CNPG `Cluster` CR never becomes `Ready`, check:
 
-* `supabase/postgres` is updated from `14.1` to `15.1`, which warrants backing up all your data before proceeding to update to the next major version.
-* Intialization scripts for `supabase/postgres` has been reworked and matched closely to the [Docker Compose](https://github.com/supabase/supabase/blob/master/docker/docker-compose.yml) version. Further tweaks to the scripts are needed to ensure backward-compatibility.
-* Migration scripts are now exposed at `db.config`, which will be mounted at `/docker-entrypoint-initdb.d/migrations/`. Simply copy your migration files from your local project's `supabase/migration` and populate the `db.config`.
-* Ingress are now limited to `kong` & `db` services. This is by design to limit entry to the stack through secure `kong` service.
-* `kong.yaml` has been modified to follow [Docker kong.yaml](https://github.com/supabase/supabase/blob/master/docker/volumes/api/kong.yml) template.
-* `supabase/storage` does not comes with pre-populated `/var/lib/storage`, therefore an `emptyDir` will be created if persistence is disabled. This might be incompatible with previous version if the persistent storage location is set to location other than specified above.
-* `supabase/vector` requires read access to the `/var/log/pods` directory. When run in a Kubernetes cluster this can be provided with a [hostPath](https://kubernetes.io/docs/concepts/storage/volumes/#hostpath) volume.
+- The CNPG operator is installed and healthy (`kubectl get pods -n cnpg-system`).
+- `files/db/init.sql` and `files/db/migrations.sql` exist and match `Chart.yaml` `appVersion`. Rerun `./scripts/fetch-db-init.sh` if needed.
+- The pre-install `db-generator` Job has completed (`kubectl get jobs -l app.kubernetes.io/component=db-generator`). Without it, `managed.roles[*].passwordSecret` references point to missing Secrets.

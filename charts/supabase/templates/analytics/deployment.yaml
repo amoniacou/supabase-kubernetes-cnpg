@@ -34,31 +34,11 @@ spec:
           imagePullPolicy: {{ .Values.image.initDb.pullPolicy }}
           env:
             - name: DB_HOST
-              {{- if .Values.deployment.db.enabled }}
               value: {{ include "supabase.db.fullname" . | quote }}
-              {{- else if and .Values.secret.db.secretRef (hasKey (default (dict) .Values.secret.db.secretRefKey) "host") }}
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "supabase.secret.db.name" . }}
-                  key: {{ include "supabase.secret.db.key.host" . }}
-              {{- else if .Values.secret.db.host }}
-              value: {{ .Values.secret.db.host | quote }}
-              {{- else }}
-              value: {{ .Values.environment.analytics.DB_HOST | quote }}
-              {{- end }}
             - name: DB_USER
               value: $(DB_USERNAME)
             - name: DB_PORT
-              {{- if and (not .Values.deployment.db.enabled) .Values.secret.db.secretRef (hasKey (default (dict) .Values.secret.db.secretRefKey) "port") }}
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "supabase.secret.db.name" . }}
-                  key: {{ include "supabase.secret.db.key.port" . }}
-              {{- else if and (not .Values.deployment.db.enabled) .Values.secret.db.port }}
-              value: {{ .Values.secret.db.port | quote }}
-              {{- else }}
               value: {{ .Values.environment.analytics.DB_PORT | quote }}
-              {{- end }}
           command: ["/bin/sh", "-c"]
           args:
             - |
@@ -75,44 +55,41 @@ spec:
           imagePullPolicy: {{ .Values.image.analytics.pullPolicy }}
           env:
             {{- range $key, $value := .Values.environment.analytics }}
-            {{- if not (and (not $.Values.deployment.db.enabled) (or (and (eq $key "DB_HOST") (or (and $.Values.secret.db.secretRef (hasKey (default (dict) $.Values.secret.db.secretRefKey) "host")) $.Values.secret.db.host)) (and (eq $key "DB_PORT") (or (and $.Values.secret.db.secretRef (hasKey (default (dict) $.Values.secret.db.secretRefKey) "port")) $.Values.secret.db.port)))) }}
             - name: {{ $key }}
               value: {{ $value | quote }}
             {{- end }}
-            {{- end }}
             - name: DB_HOSTNAME
-              {{- if .Values.deployment.db.enabled }}
               value: {{ include "supabase.db.fullname" . | quote }}
-              {{- else if and .Values.secret.db.secretRef (hasKey (default (dict) .Values.secret.db.secretRefKey) "host") }}
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "supabase.secret.db.name" . }}
-                  key: {{ include "supabase.secret.db.key.host" . }}
-              {{- else if .Values.secret.db.host }}
-              value: {{ .Values.secret.db.host | quote }}
-              {{- else }}
-              value: {{ .Values.environment.analytics.DB_HOST | quote }}
-              {{- end }}
             - name: DB_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "supabase.secret.db.name" . }}
-                  key: {{ include "supabase.secret.db.key.password" . }}
+                  name: {{ include "supabase.secret.dbRole" (dict "root" $ "role" "supabase_admin") }}
+                  key: password
             - name: DB_PASSWORD_ENC
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "supabase.secret.db.name" . }}
-                  key: {{ include "supabase.secret.db.key.passwordEncoded" . }}
+                  name: {{ include "supabase.secret.dbRole" (dict "root" $ "role" "supabase_admin") }}
+                  key: password
             - name:  LOGFLARE_PUBLIC_ACCESS_TOKEN
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "supabase.secret.analytics.name" . }}
-                  key: {{ include "supabase.secret.analytics.key.publicAccessToken" . }}
+                  {{- if .Values.secret.analytics.secretRef }}
+                  name: {{ .Values.secret.analytics.secretRef }}
+                  key: {{ .Values.secret.analytics.secretRefKey.publicAccessToken | default "publicAccessToken" }}
+                  {{- else }}
+                  name: {{ include "supabase.secret.analytics" . }}
+                  key: publicAccessToken
+                  {{- end }}
             - name: LOGFLARE_PRIVATE_ACCESS_TOKEN
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "supabase.secret.analytics.name" . }}
-                  key: {{ include "supabase.secret.analytics.key.privateAccessToken" . }}
+                  {{- if .Values.secret.analytics.secretRef }}
+                  name: {{ .Values.secret.analytics.secretRef }}
+                  key: {{ .Values.secret.analytics.secretRefKey.privateAccessToken | default "privateAccessToken" }}
+                  {{- else }}
+                  name: {{ include "supabase.secret.analytics" . }}
+                  key: privateAccessToken
+                  {{- end }}
             {{- if .Values.bigQuery.enabled }}
             - name: GOOGLE_PROJECT_ID
               value: {{ .Values.bigQuery.projectId | quote }}
@@ -141,7 +118,7 @@ spec:
             {{- if .Values.bigQuery.enabled }}
             - mountPath: /opt/app/rel/logflare/bin/gcloud.json
               name: gcloud-credentials
-              subPath: {{ include "supabase.secret.bigquery.key.gcloudJson" . }}
+              subPath: gcloud.json
             {{- end }}
           {{- end }}
           {{- with .Values.deployment.analytics.resources }}
@@ -156,7 +133,7 @@ spec:
         {{- if .Values.bigQuery.enabled }}
         - name: gcloud-credentials
           secret:
-            secretName: {{ include "supabase.secret.bigquery.name" . }}
+            secretName: {{ include "supabase.analytics.fullname" . }}-gcloud
         {{- end }}
       {{- end }}
       {{- with .Values.deployment.analytics.nodeSelector }}
@@ -165,6 +142,10 @@ spec:
       {{- end }}
       {{- with .Values.deployment.analytics.affinity }}
       affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.deployment.analytics.topologySpreadConstraints }}
+      topologySpreadConstraints:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       {{- with .Values.deployment.analytics.tolerations }}

@@ -1,0 +1,120 @@
+{{- if .Values.cnpg.enabled }}
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: {{ .Values.cnpg.clusterName }}
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+spec:
+  instances: {{ .Values.cnpg.instances }}
+
+  imageName: "{{ .Values.cnpg.image.repository }}:{{ .Values.cnpg.image.tag | default .Chart.AppVersion }}"
+
+  postgresql:
+    parameters:
+      {{- range $key, $value := .Values.cnpg.postgresql.parameters }}
+      {{ $key }}: {{ $value | quote }}
+      {{- end }}
+    {{- with .Values.cnpg.postgresql.shared_preload_libraries }}
+    shared_preload_libraries:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+
+  {{- with .Values.cnpg.resources }}
+  resources:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+
+  storage:
+    size: {{ .Values.cnpg.storage.size }}
+    {{- with .Values.persistence.storageClassName }}
+    storageClass: {{ . | quote }}
+    {{- end }}
+
+  postgresUID: {{ .Values.cnpg.postgresUID }}
+  postgresGID: {{ .Values.cnpg.postgresGID }}
+
+  enableSuperuserAccess: true
+
+  # Each role's password lives in its own basic-auth Secret created by the
+  # pre-install db-generator Job (or supplied via secret.db.existingSecrets).
+  superuserSecret:
+    name: {{ include "supabase.secret.dbRole" (dict "root" $ "role" "postgres") }}
+
+  bootstrap:
+    initdb:
+      database: {{ .Values.secret.db.database | default "postgres" }}
+      owner: supabase_admin
+      # Set the supabase_admin password from its own basic-auth Secret so the
+      # initdb-owned role matches what services connect with.
+      secret:
+        name: {{ include "supabase.secret.dbRole" (dict "root" $ "role" "supabase_admin") }}
+      encoding: 'UTF8'
+      # Runs as the `postgres` superuser against the `postgres` DB.
+      # Needed because `database: postgres` does NOT transfer ownership of
+      # the postgres system DB to supabase_admin, so GRANT/CREATE on
+      # DATABASE postgres issued as supabase_admin would fail silently.
+      postInitSQLRefs:
+        configMapRefs:
+          {{- $cm := include "supabase.db.initdb.fullname" . }}
+          {{- range $key := list "00-init.sql" "01-migrations.sql" "98-webhooks.sql" "99-realtime.sql" }}
+          - name: {{ $cm }}
+            key: {{ $key }}
+          {{- end }}
+          {{- if and .Values.secret.jwt (not .Values.secret.jwt.secretRef) .Values.secret.jwt.generate }}
+          # 99-jwt.sql is materialized by the jwt-generator Job with literal values
+          # (not env-var indirection), so it works during CNPG's bootstrap.initdb.
+          - name: {{ include "supabase.secret.jwt" . }}-sql
+            key: 99-jwt.sql
+          {{- end }}
+
+  env:
+    - name: POSTGRES_USER
+      value: supabase_admin
+
+  # Declaratively-managed Supabase roles. Each password comes from its own
+  # basic-auth Secret (see supabase.secret.dbRole helper).
+  managed:
+    roles:
+      - name: authenticator
+        ensure: present
+        comment: "PostgREST login role"
+        login: true
+        inherit: false
+        passwordSecret:
+          name: {{ include "supabase.secret.dbRole" (dict "root" $ "role" "authenticator") }}
+      - name: pgbouncer
+        ensure: present
+        comment: "PgBouncer connection pooler role"
+        login: true
+        passwordSecret:
+          name: {{ include "supabase.secret.dbRole" (dict "root" $ "role" "pgbouncer") }}
+      - name: supabase_auth_admin
+        ensure: present
+        comment: "Owner of auth schema"
+        login: true
+        createrole: true
+        inherit: false
+        passwordSecret:
+          name: {{ include "supabase.secret.dbRole" (dict "root" $ "role" "supabase_auth_admin") }}
+      - name: supabase_storage_admin
+        ensure: present
+        comment: "Owner of storage schema"
+        login: true
+        createrole: true
+        inherit: false
+        passwordSecret:
+          name: {{ include "supabase.secret.dbRole" (dict "root" $ "role" "supabase_storage_admin") }}
+      - name: supabase_functions_admin
+        ensure: present
+        comment: "Owner of supabase_functions schema"
+        login: true
+        createrole: true
+        inherit: false
+        passwordSecret:
+          name: {{ include "supabase.secret.dbRole" (dict "root" $ "role" "supabase_functions_admin") }}
+
+  affinity:
+    enablePodAntiAffinity: true
+    topologyKey: kubernetes.io/hostname
+{{- end }}

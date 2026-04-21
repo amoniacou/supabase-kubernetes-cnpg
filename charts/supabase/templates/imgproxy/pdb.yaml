@@ -1,0 +1,21 @@
+{{- if .Values.deployment.imgproxy.enabled -}}
+{{- if (.Values.deployment.imgproxy.podDisruptionBudget).enabled -}}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "supabase.imgproxy.fullname" . }}-pdb
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+spec:
+  {{- if .Values.deployment.imgproxy.podDisruptionBudget.minAvailable }}
+  minAvailable: {{ .Values.deployment.imgproxy.podDisruptionBudget.minAvailable }}
+  {{- else if .Values.deployment.imgproxy.podDisruptionBudget.maxUnavailable }}
+  maxUnavailable: {{ .Values.deployment.imgproxy.podDisruptionBudget.maxUnavailable }}
+  {{- else }}
+  minAvailable: 1
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "supabase.imgproxy.selectorLabels" . | nindent 6 }}
+{{- end }}
+{{- end }}

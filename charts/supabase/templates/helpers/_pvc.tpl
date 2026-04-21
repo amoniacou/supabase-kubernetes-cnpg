@@ -18,13 +18,17 @@ Usage: {{ include "supabase.pvc.name" (dict "root" $ "name" "alias") }}
 
 {{/*
 Create a PVC for a given workload name.
-Usage: {{ include "supabase.pvc" (dict "root" $ "name" "workload" "enabled": "true") }}
+Usage: {{ include "supabase.pvc" (dict "root" $ "name" "workload" "enabled" true "shared" false) }}
+  shared: true  → use persistence.storageClassNameShared (RWX)
+  shared: false → use persistence.storageClassName       (RWO)
 */}}
 {{- define "supabase.pvc" -}}
 {{- $root := .root -}}
 {{- $name := .name -}}
 {{- $enabled := .enabled -}}
+{{- $shared := .shared -}}
 {{- $persistence := index $root.Values.persistence $name -}}
+{{- $sc := ternary $root.Values.persistence.storageClassNameShared $root.Values.persistence.storageClassName $shared -}}
 
 {{- if and $enabled $persistence.enabled (not $persistence.existingClaim) -}}
 apiVersion: v1
@@ -38,8 +42,8 @@ metadata:
     {{- toYaml . | nindent 4 }}
   {{- end }}
 spec:
-  {{- if $persistence.storageClassName }}
-  storageClassName: {{ $persistence.storageClassName }}
+  {{- if $sc }}
+  storageClassName: {{ $sc | quote }}
   {{- end }}
   accessModes:
     {{- range $persistence.accessModes }}

@@ -15,14 +15,13 @@ type: application
 # This is the chart version. This version number should be incremented each time you make changes
 # to the chart and its templates, including the app version.
 # Versions are expected to follow Semantic Versioning (https://semver.org/)
-version: 0.5.5
+version: 0.6.0
 
-# This is the version number of the application being deployed. This version number should be
-# incremented each time you make changes to the application. Versions are not expected to
-# follow Semantic Versioning. They should reflect the version the application is using.
-# It is recommended to use it with quotes.
-# Not used because too difficult to follow correctly
-# appVersion: "1.16.0"
+# Default supabase/postgres image tag used by the CNPG cluster. Per-deploy
+# overrides via `cnpg.image.tag`. Bump this when syncing a new upstream
+# supabase/postgres release and regenerate files/db/*.sql via
+# scripts/fetch-db-init.sh.
+appVersion: "17.6.1.108"
 
 # A URL to an SVG or PNG image to be used as an icon
 icon: https://avatars.githubusercontent.com/u/54469796?s=280&v=4

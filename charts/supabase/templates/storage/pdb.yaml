@@ -1,0 +1,21 @@
+{{- if .Values.deployment.storage.enabled -}}
+{{- if (.Values.deployment.storage.podDisruptionBudget).enabled -}}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "supabase.storage.fullname" . }}-pdb
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+spec:
+  {{- if .Values.deployment.storage.podDisruptionBudget.minAvailable }}
+  minAvailable: {{ .Values.deployment.storage.podDisruptionBudget.minAvailable }}
+  {{- else if .Values.deployment.storage.podDisruptionBudget.maxUnavailable }}
+  maxUnavailable: {{ .Values.deployment.storage.podDisruptionBudget.maxUnavailable }}
+  {{- else }}
+  minAvailable: 1
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "supabase.storage.selectorLabels" . | nindent 6 }}
+{{- end }}
+{{- end }}

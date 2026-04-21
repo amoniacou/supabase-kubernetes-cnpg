@@ -20,10 +20,28 @@ Expand the name of the dashboard secret.
 {{- end -}}
 
 {{/*
-Expand the name of the database secret.
+Return the Secret name that holds credentials for the given Postgres role.
+Honors .Values.secret.db.existingSecrets.<role>; falls back to
+"<fullname>-db-<role-with-dashes>", which is what the db-generator Job creates.
+Usage: {{ include "supabase.secret.dbRole" (dict "root" $ "role" "authenticator") }}
 */}}
-{{- define "supabase.secret.db" -}}
-{{- printf "%s-db" (include "supabase.fullname" .) }}
+{{- define "supabase.secret.dbRole" -}}
+{{- $root := .root -}}
+{{- $role := .role -}}
+{{- $existing := get (default (dict) $root.Values.secret.db.existingSecrets) $role -}}
+{{- if $existing -}}
+{{- $existing -}}
+{{- else -}}
+{{- printf "%s-db-%s" (include "supabase.fullname" $root) ($role | replace "_" "-") -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+List of Postgres roles the chart provisions. Order matters only for stable
+rendering of the generator Job; the roles themselves are independent.
+*/}}
+{{- define "supabase.db.roles" -}}
+postgres supabase_admin authenticator pgbouncer supabase_auth_admin supabase_storage_admin supabase_functions_admin
 {{- end -}}
 
 {{/*
