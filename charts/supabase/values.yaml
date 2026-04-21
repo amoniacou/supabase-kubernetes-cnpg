@@ -41,46 +41,30 @@
 ## 12. gateway        - Optional Gateway API HTTPRoute (alpha)
 
 secret:
-  ## JSON Web Tokens
-  ## Used to sign and validate access tokens across all Supabase services
-  ## Docs: https://supabase.com/docs/guides/self-hosting/docker#generate-and-configure-api-keys
+  ## JSON Web Tokens + asymmetric API keys
+  ## Used to sign and validate access tokens across all Supabase services.
+  ## A pre-install Job (jwt-generator) generates the following keys on first
+  ## install and writes them into a single Secret `<release>-supabase-jwt`:
+  ##   secret, anonKey, serviceKey                (HS256 legacy)
+  ##   anonKeyAsymmetric, serviceKeyAsymmetric    (ES256)
+  ##   publishableKey, secretKey                  (opaque sb_* keys)
+  ##   jwtKeys, jwtJwks                           (EC JWKS)
+  ## Existing Secrets are left untouched, so keys never rotate implicitly.
+  ## Docs: https://supabase.com/docs/guides/self-hosting/self-hosted-auth-keys
   ##
   jwt:
-    anonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyAgCiAgICAicm9sZSI6ICJhbm9uIiwKICAgICJpc3MiOiAic3VwYWJhc2UtZGVtbyIsCiAgICAiaWF0IjogMTY0MTc2OTIwMCwKICAgICJleHAiOiAxNzk5NTM1NjAwCn0.dc_X5iR_VP_qT0zsiyj_I_OZ2T9FtRU2BBNWN8Bu4GE"
-    serviceKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyAgCiAgICAicm9sZSI6ICJzZXJ2aWNlX3JvbGUiLAogICAgImlzcyI6ICJzdXBhYmFzZS1kZW1vIiwKICAgICJpYXQiOiAxNjQxNzY5MjAwLAogICAgImV4cCI6IDE3OTk1MzU2MDAKfQ.DaYlNEoUrrEn2Ig7tqibS-PHK5vgusbcbo7X36XVt4Q"
-    secret: "your-super-secret-jwt-token-with-at-least-32-characters-long"
+    ## Reference to an existing Secret with pre-populated keys (see list above).
+    ## When set (non-empty), the generator Job is skipped and services read
+    ## all keys from this Secret.
+    secretRef: ""
 
-    ## Reference to existing secret
-    # secretRef: ""
-
-    ## Map to actual keys inside secretRef if they differ
+    ## Map to actual key names inside secretRef if they differ from the
+    ## defaults (anonKey, serviceKey, secret, publishableKey, secretKey,
+    ## anonKeyAsymmetric, serviceRoleKeyAsymmetric, jwtKeys, jwtJwks).
     # secretRefKey:
     #   anonKey: anonKey
     #   serviceKey: serviceKey
     #   secret: secret
-
-  ## API key material for asymmetric auth support
-  ## Docs: https://supabase.com/docs/guides/self-hosting/self-hosted-auth-keys
-  ##
-  apikey:
-    publishableKey: ""
-    secretKey: ""
-    anonKeyAsymmetric: ""
-    serviceRoleKeyAsymmetric: ""
-    jwtKeys: ""
-    jwtJwks: ""
-
-    ## Reference to existing secret
-    # secretRef: ""
-
-    ## Map to actual keys inside secretRef if they differ
-    # secretRefKey:
-    #   publishableKey: publishableKey
-    #   secretKey: secretKey
-    #   anonKeyAsymmetric: anonKeyAsymmetric
-    #   serviceRoleKeyAsymmetric: serviceRoleKeyAsymmetric
-    #   jwtKeys: jwtKeys
-    #   jwtJwks: jwtJwks
 
   ## PostgreSQL credentials
   ##

@@ -25,3 +25,7 @@ appVersion: "17.6.1.108"
 
 # A URL to an SVG or PNG image to be used as an icon
 icon: https://avatars.githubusercontent.com/u/54469796?s=280&v=4
+
+home: https://github.com/amoniacou/supabase-kubernetes-cnpg
+sources:
+  - https://github.com/amoniacou/supabase-kubernetes-cnpg

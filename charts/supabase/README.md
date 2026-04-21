@@ -95,29 +95,28 @@ If you want to use mail, consider to adjust the following values in `values.yaml
 
 ### JWT Secret
 
-By default (`secret.jwt.generate: true`) a **pre-install Job** mints a fresh `JWT_SECRET`, `ANON_KEY`, and `SERVICE_ROLE_KEY` (HS256-signed JWTs) and writes them to `<release>-supabase-jwt`. This mirrors the [`generate-keys.sh`](https://supabase.com/docs/guides/self-hosting/docker#generate-and-configure-api-keys) step from the Docker setup guide. The Job is idempotent — the Secret is populated only on the first install; subsequent upgrades reuse the existing values.
+A **pre-install Job** (`jwt-generator`) mints the full set of JWT material on first install and writes it to a single Secret `<release>-supabase-jwt`:
 
-To bring your own keys instead, either:
+- HS256 legacy — `secret`, `anonKey`, `serviceKey`
+- ES256 asymmetric — `anonKeyAsymmetric`, `serviceKeyAsymmetric`, `jwtKeys`, `jwtJwks`
+- Opaque sb_* keys — `publishableKey`, `secretKey`
 
-```yaml
-# Inline (only for local dev)
-secret:
-  jwt:
-    generate: false
-    anonKey: <new-anon-jwt>
-    serviceKey: <new-service-role-jwt>
-    secret: <jwt-secret>
-```
+This mirrors upstream Supabase's [`generate-keys.sh`](https://supabase.com/docs/guides/self-hosting/docker#generate-and-configure-api-keys) + [`add-new-auth-keys.sh`](https://supabase.com/docs/guides/self-hosting/self-hosted-auth-keys) in one step. The Job is idempotent — the Secret is populated only on the first install; subsequent upgrades reuse the existing values so keys never rotate implicitly.
+
+To bring your own pre-populated Secret (recommended for production, e.g. from an external secret manager):
 
 ```yaml
-# Pre-created Secret
 secret:
   jwt:
-    generate: false
     secretRef: my-supabase-jwt
+    # Optional: map to actual key names inside the referenced Secret
+    # secretRefKey:
+    #   anonKey: anonKey
+    #   serviceKey: serviceKey
+    #   secret: secret
 ```
 
-The 32+ character shared `secret` can be generated with `openssl rand -base64 48`. For asymmetric (publishable / secret key) material, populate `secret.apikey.*` — see [self-hosted auth keys docs](https://supabase.com/docs/guides/self-hosting/self-hosted-auth-keys).
+When `secretRef` is set, the generator Job is skipped entirely. The referenced Secret must contain all nine keys above. See the [self-hosted auth keys docs](https://supabase.com/docs/guides/self-hosting/self-hosted-auth-keys) for how to produce them.
 
 ### SMTP Secret
 
@@ -244,7 +243,7 @@ Important points to consider:
 - Add SSL to the Postgres cluster via CNPG's [TLS configuration](https://cloudnative-pg.io/documentation/current/certificates/).
 - Add SSL to the Ingress endpoint via `cert-manager` or a LoadBalancer provider.
 - Change the domain in `host:` to your real one.
-- Generate fresh JWT material on install (the default `secret.jwt.generate: true` already does this), or bring your own via `secret.jwt.secretRef`.
+- JWT material is generated automatically on first install; for production prefer to bring your own via `secret.jwt.secretRef` from an external secret manager.
 - Override `secret.*` with `secretRef` for every block containing credentials — do not leave the inline defaults in production.
 
 ## Database bootstrap

@@ -58,7 +58,7 @@ Multi-node: with `--workers N`, kind creates `N` worker nodes labeled round-robi
 
 Full chart documentation is in [`charts/supabase/README.md`](./charts/supabase/README.md). Highlights:
 
-- **Auto-generated credentials** — a pre-install Job mints `JWT_SECRET` + `ANON_KEY` + `SERVICE_ROLE_KEY` (HS256-signed JWTs) on first install, mirroring Supabase's [`generate-keys.sh`](https://supabase.com/docs/guides/self-hosting/docker#generate-and-configure-api-keys). Disable with `secret.jwt.generate=false` and bring your own.
+- **Auto-generated credentials** — a pre-install Job mints the full JWT material on first install: HS256 legacy keys (`JWT_SECRET`, `anonKey`, `serviceKey`), ES256 asymmetric keys (`anonKeyAsymmetric`, `serviceKeyAsymmetric`, `jwtKeys`, `jwtJwks`), and opaque `sb_publishable_*` / `sb_secret_*` keys. Bring your own via `secret.jwt.secretRef`.
 - **Per-role DB secrets** — a second pre-install Job creates one `basic-auth` Secret per Postgres role (`postgres`, `authenticator`, `supabase_auth_admin`, …). CNPG and each service read only their own credential.
 - **Kong entrypoint** aligned with the upstream `supabase/supabase` `docker/volumes/api/kong-entrypoint.sh` — honors both legacy `anon`/`service_role` keys and the new asymmetric `SUPABASE_PUBLISHABLE_KEY` / `SUPABASE_SECRET_KEY` pair.
 - **PodDisruptionBudgets** — opt-in per stateless service via `deployment.<svc>.podDisruptionBudget.enabled`. CNPG manages the Postgres PDB itself.

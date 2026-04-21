@@ -61,7 +61,7 @@ spec:
           - name: {{ $cm }}
             key: {{ $key }}
           {{- end }}
-          {{- if and .Values.secret.jwt (not .Values.secret.jwt.secretRef) .Values.secret.jwt.generate }}
+          {{- if and .Values.secret.jwt (not .Values.secret.jwt.secretRef) }}
           # 99-jwt.sql is materialized by the jwt-generator Job with literal values
           # (not env-var indirection), so it works during CNPG's bootstrap.initdb.
           - name: {{ include "supabase.secret.jwt" . }}-sql
