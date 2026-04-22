@@ -57,7 +57,7 @@ spec:
       postInitSQLRefs:
         configMapRefs:
           {{- $cm := include "supabase.db.initdb.fullname" . }}
-          {{- range $key := list "00-init.sql" "01-migrations.sql" "97-extensions.sql" "98-webhooks.sql" "99-realtime.sql" }}
+          {{- range $key := list "00-init.sql" "01-migrations.sql" "98-webhooks.sql" "99-realtime.sql" }}
           - name: {{ $cm }}
             key: {{ $key }}
           {{- end }}
@@ -111,6 +111,16 @@ spec:
         login: true
         createrole: true
         inherit: false
+        # Storage runs `set_config('role','service_role',true)` on every
+        # request. With both supabase_storage_admin and authenticator
+        # NOINHERIT, upstream migration 20231013's transitive chain
+        # (storage_admin → authenticator → service_role) is not satisfied by
+        # PG17's check_role(), so re-grant the memberships directly and let
+        # CNPG reconcile them if a later migration revokes them again.
+        inRoles:
+          - anon
+          - authenticated
+          - service_role
         passwordSecret:
           name: {{ include "supabase.secret.dbRole" (dict "root" $ "role" "supabase_storage_admin") }}
       - name: supabase_functions_admin
