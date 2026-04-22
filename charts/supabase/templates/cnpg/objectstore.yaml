@@ -1,0 +1,19 @@
+{{- if and .Values.cnpg.enabled .Values.cnpg.backup.enabled }}
+{{- if not .Values.cnpg.backup.objectStore.existingName }}
+{{- if not .Values.cnpg.backup.objectStore.configuration }}
+{{- fail "cnpg.backup.objectStore.configuration is required when cnpg.backup.enabled=true and cnpg.backup.objectStore.existingName is empty" }}
+{{- end }}
+apiVersion: barmancloud.cnpg.io/v1
+kind: ObjectStore
+metadata:
+  name: {{ .Values.cnpg.backup.objectStore.name | default (printf "%s-backup" .Values.cnpg.clusterName) }}
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+spec:
+  configuration:
+    {{- toYaml .Values.cnpg.backup.objectStore.configuration | nindent 4 }}
+  {{- with .Values.cnpg.backup.objectStore.retentionPolicy }}
+  retentionPolicy: {{ . | quote }}
+  {{- end }}
+{{- end }}
+{{- end }}

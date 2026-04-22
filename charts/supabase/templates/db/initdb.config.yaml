@@ -23,7 +23,7 @@ data:
   # and we don't want that to fail the whole initdb.
   97-extensions.sql: |
     CREATE EXTENSION IF NOT EXISTS pg_stat_statements WITH SCHEMA extensions;
-    CREATE EXTENSION IF NOT EXISTS pg_net;
+    CREATE EXTENSION IF NOT EXISTS pg_net WITH SCHEMA extensions;
     DO $$
     BEGIN
       CREATE EXTENSION IF NOT EXISTS pgjwt WITH SCHEMA extensions;

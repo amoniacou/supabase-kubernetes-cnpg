@@ -1,0 +1,18 @@
+{{- if and .Values.cnpg.enabled .Values.cnpg.backup.enabled .Values.cnpg.backup.scheduledBackup.enabled }}
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: {{ .Values.cnpg.backup.scheduledBackup.name | default (printf "%s-daily" .Values.cnpg.clusterName) }}
+  labels:
+    {{- include "supabase.labels" . | nindent 4 }}
+spec:
+  schedule: {{ .Values.cnpg.backup.scheduledBackup.schedule | quote }}
+  backupOwnerReference: {{ .Values.cnpg.backup.scheduledBackup.backupOwnerReference | quote }}
+  immediate: {{ .Values.cnpg.backup.scheduledBackup.immediate }}
+  suspend: {{ .Values.cnpg.backup.scheduledBackup.suspend }}
+  cluster:
+    name: {{ .Values.cnpg.clusterName }}
+  method: plugin
+  pluginConfiguration:
+    name: {{ .Values.cnpg.backup.pluginName | quote }}
+{{- end }}

@@ -1118,3 +1118,97 @@ cnpg:
       - "plan_filter"
       # - "supabase_vault"
       - "supautils"
+
+  ## ---------------------------------------------------------------------------
+  ## Backups via the CloudNativePG Barman Cloud plugin (plugin-barman-cloud).
+  ##
+  ## The plugin itself must be installed in the cluster separately; this chart
+  ## only renders the plugin-facing resources (ObjectStore, Cluster.spec.plugins
+  ## wiring, and ScheduledBackup). Install guide:
+  ## https://github.com/cloudnative-pg/plugin-barman-cloud
+  ## ---------------------------------------------------------------------------
+  backup:
+    ## Master toggle. When false, no ObjectStore / ScheduledBackup is rendered
+    ## and no plugin entry is added to the Cluster spec.
+    enabled: false
+
+    ## Plugin name as registered by plugin-barman-cloud in the cluster.
+    pluginName: "barman-cloud.cloudnative-pg.io"
+
+    objectStore:
+      ## Reference an already-existing ObjectStore (e.g., shared across
+      ## clusters) by name. When set, the chart will NOT render an ObjectStore
+      ## and will only wire the Cluster plugin to this name.
+      existingName: ""
+
+      ## Name of the ObjectStore the chart renders when existingName is empty.
+      ## Defaults to "<cnpg.clusterName>-backup".
+      name: ""
+
+      ## Passed to ObjectStore.spec.retentionPolicy.
+      retentionPolicy: "30d"
+
+      ## Pass-through to ObjectStore.spec.configuration. Required when
+      ## existingName is empty — the chart does not invent a destination.
+      ##
+      ## Example — in-cluster bundled MinIO (see `minio:` section):
+      ## configuration:
+      ##   destinationPath: s3://supabase-backup/
+      ##   endpointURL: http://supabase-minio:9000
+      ##   s3Credentials:
+      ##     accessKeyId:
+      ##       name: supabase-minio
+      ##       key: rootUser
+      ##     secretAccessKey:
+      ##       name: supabase-minio
+      ##       key: rootPassword
+      ##   wal:
+      ##     compression: gzip
+      ##   data:
+      ##     compression: gzip
+      ##
+      ## Example — AWS S3 with IRSA (no explicit credentials needed):
+      ## configuration:
+      ##   destinationPath: s3://my-bucket/supabase
+      ##
+      ## Example — GCS:
+      ## configuration:
+      ##   destinationPath: gs://my-bucket/supabase
+      ##   googleCredentials:
+      ##     applicationCredentials:
+      ##       name: gcs-creds
+      ##       key: key.json
+      ##
+      ## Example — Azure Blob:
+      ## configuration:
+      ##   destinationPath: https://<account>.blob.core.windows.net/<container>/
+      ##   azureCredentials:
+      ##     storageAccount:
+      ##       name: azure-creds
+      ##       key: storage-account
+      ##     storageKey:
+      ##       name: azure-creds
+      ##       key: storage-key
+      configuration: {}
+
+    scheduledBackup:
+      ## Render a ScheduledBackup resource. Set to false to only enable
+      ## continuous WAL archiving via the plugin without a scheduled base backup.
+      enabled: true
+
+      ## Name of the ScheduledBackup. Defaults to
+      ## "<cnpg.clusterName>-daily" when empty.
+      name: ""
+
+      ## 6-field Quartz cron (seconds minutes hours day month dow) used by CNPG.
+      ## Default: every day at 02:00:00.
+      schedule: "0 0 2 * * *"
+
+      ## Take a backup immediately when the ScheduledBackup is created.
+      immediate: false
+
+      ## Temporarily stop scheduling without deleting the resource.
+      suspend: false
+
+      ## backupOwnerReference: "none" | "self" | "cluster".
+      backupOwnerReference: "self"

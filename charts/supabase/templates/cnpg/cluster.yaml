@@ -72,6 +72,14 @@ spec:
     - name: POSTGRES_USER
       value: supabase_admin
 
+  {{- if .Values.cnpg.backup.enabled }}
+  plugins:
+    - name: {{ .Values.cnpg.backup.pluginName | quote }}
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: {{ .Values.cnpg.backup.objectStore.existingName | default (.Values.cnpg.backup.objectStore.name | default (printf "%s-backup" .Values.cnpg.clusterName)) | quote }}
+  {{- end }}
+
   # Declaratively-managed Supabase roles. Each password comes from its own
   # basic-auth Secret (see supabase.secret.dbRole helper).
   managed:
