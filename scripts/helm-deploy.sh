@@ -182,6 +182,29 @@ else
   echo "WARNING: could not resolve Traefik LB IP — access via the LB IP printed by 'kubectl -n traefik get svc traefik'." >&2
 fi
 
+# Studio dashboard credentials (HTTP Basic Auth through Kong). The generator
+# Job runs as a pre-install hook so the Secret is in place once helm upgrade
+# returns. If the user supplied their own existingSecret, skip with a note.
+dash_ref="$(helm --kube-context "$CTX" get values "$RELEASE" -n "$RELEASE" -a \
+  -o json 2>/dev/null | python3 -c \
+  'import json,sys;d=json.load(sys.stdin);print(d.get("secret",{}).get("dashboard",{}).get("existingSecret") or "")' 2>/dev/null || true)"
+dash_secret="${dash_ref:-${FULLNAME}-dashboard}"
+dash_user="$(kubectl --context "$CTX" -n "$RELEASE" get secret "$dash_secret" \
+  -o jsonpath='{.data.username}' 2>/dev/null | base64 -d 2>/dev/null || true)"
+dash_pass="$(kubectl --context "$CTX" -n "$RELEASE" get secret "$dash_secret" \
+  -o jsonpath='{.data.password}' 2>/dev/null | base64 -d 2>/dev/null || true)"
+if [[ -n "$dash_user" && -n "$dash_pass" ]]; then
+  cat <<EOF
+
+Studio dashboard login (HTTP Basic Auth):
+  user: $dash_user
+  pass: $dash_pass
+EOF
+else
+  echo
+  echo "WARNING: could not read dashboard credentials from Secret '$dash_secret' in namespace '$RELEASE'." >&2
+fi
+
 # --- Backup smoke test --------------------------------------------------
 # Pre-creates the bucket in the in-cluster MinIO (CNPG's barman-cloud plugin
 # expects it to exist), then triggers an on-demand Backup CR and waits for
@@ -242,27 +265,4 @@ EOF
     "backup/${backup_name}" --timeout=5m
 
   echo "Backup: smoke backup ${backup_name} completed."
-fi
-
-# Studio dashboard credentials (HTTP Basic Auth through Kong). The generator
-# Job runs as a pre-install hook so the Secret is in place once helm upgrade
-# returns. If the user supplied their own secretRef, skip with a note.
-dash_ref="$(helm --kube-context "$CTX" get values "$RELEASE" -n "$RELEASE" -a \
-  -o json 2>/dev/null | python3 -c \
-  'import json,sys;d=json.load(sys.stdin);print(d.get("secret",{}).get("dashboard",{}).get("secretRef",""))' 2>/dev/null || true)"
-dash_secret="${dash_ref:-${FULLNAME}-dashboard}"
-dash_user="$(kubectl --context "$CTX" -n "$RELEASE" get secret "$dash_secret" \
-  -o jsonpath='{.data.username}' 2>/dev/null | base64 -d 2>/dev/null || true)"
-dash_pass="$(kubectl --context "$CTX" -n "$RELEASE" get secret "$dash_secret" \
-  -o jsonpath='{.data.password}' 2>/dev/null | base64 -d 2>/dev/null || true)"
-if [[ -n "$dash_user" && -n "$dash_pass" ]]; then
-  cat <<EOF
-
-Studio dashboard login (HTTP Basic Auth):
-  user: $dash_user
-  pass: $dash_pass
-EOF
-else
-  echo
-  echo "WARNING: could not read dashboard credentials from Secret '$dash_secret' in namespace '$RELEASE'." >&2
 fi
