@@ -53,9 +53,9 @@ spec:
             - name: MINIO_ROOT_USER
               valueFrom:
                 secretKeyRef:
-                {{- if .Values.secret.minio.secretRef }}
-                  name: {{ .Values.secret.minio.secretRef }}
-                  key: {{ .Values.secret.minio.secretRefKey.user | default "user" }}
+                {{- if .Values.secret.minio.existingSecret }}
+                  name: {{ .Values.secret.minio.existingSecret }}
+                  key: {{ .Values.secret.minio.existingSecretKey.user | default "user" }}
                 {{- else }}
                   name: {{ include "supabase.secret.minio" . }}
                   key: user
@@ -63,9 +63,9 @@ spec:
             - name: MINIO_ROOT_PASSWORD
               valueFrom:
                 secretKeyRef:
-                {{- if .Values.secret.s3.secretRef }}
-                  name: {{ .Values.secret.s3.secretRef }}
-                  key: {{ .Values.secret.s3.secretRefKey.password | default "password" }}
+                {{- if .Values.secret.s3.existingSecret }}
+                  name: {{ .Values.secret.s3.existingSecret }}
+                  key: {{ .Values.secret.s3.existingSecretKey.password | default "password" }}
                 {{- else }}
                   name: {{ include "supabase.secret.minio" . }}
                   key: password
@@ -117,9 +117,9 @@ spec:
             - name: PGRST_JWT_SECRET
               valueFrom:
                 secretKeyRef:
-                  {{- if .Values.secret.jwt.secretRef }}
-                  name: {{ .Values.secret.jwt.secretRef }}
-                  key: {{ .Values.secret.jwt.secretRefKey.secret | default "secret" }}
+                  {{- if .Values.secret.jwt.existingSecret }}
+                  name: {{ .Values.secret.jwt.existingSecret }}
+                  key: {{ .Values.secret.jwt.existingSecretKey.secret | default "secret" }}
                   {{- else }}
                   name: {{ include "supabase.secret.jwt" . }}
                   key: secret
@@ -133,9 +133,9 @@ spec:
             - name: ANON_KEY
               valueFrom:
                 secretKeyRef:
-                  {{- if .Values.secret.jwt.secretRef }}
-                  name: {{ .Values.secret.jwt.secretRef }}
-                  key: {{ .Values.secret.jwt.secretRefKey.anonKey | default "anonKey" }}
+                  {{- if .Values.secret.jwt.existingSecret }}
+                  name: {{ .Values.secret.jwt.existingSecret }}
+                  key: {{ .Values.secret.jwt.existingSecretKey.anonKey | default "anonKey" }}
                   {{- else }}
                   name: {{ include "supabase.secret.jwt" . }}
                   key: anonKey
@@ -143,9 +143,9 @@ spec:
             - name: SERVICE_KEY
               valueFrom:
                 secretKeyRef:
-                  {{- if .Values.secret.jwt.secretRef }}
-                  name: {{ .Values.secret.jwt.secretRef }}
-                  key: {{ .Values.secret.jwt.secretRefKey.serviceKey | default "serviceKey" }}
+                  {{- if .Values.secret.jwt.existingSecret }}
+                  name: {{ .Values.secret.jwt.existingSecret }}
+                  key: {{ .Values.secret.jwt.existingSecretKey.serviceKey | default "serviceKey" }}
                   {{- else }}
                   name: {{ include "supabase.secret.jwt" . }}
                   key: serviceKey
@@ -153,9 +153,9 @@ spec:
             - name: S3_PROTOCOL_ACCESS_KEY_ID
               valueFrom:
                 secretKeyRef:
-                  {{- if .Values.secret.s3.secretRef }}
-                  name: {{ .Values.secret.s3.secretRef }}
-                  key: {{ .Values.secret.s3.secretRefKey.keyId | default "keyId" }}
+                  {{- if .Values.secret.s3.existingSecret }}
+                  name: {{ .Values.secret.s3.existingSecret }}
+                  key: {{ .Values.secret.s3.existingSecretKey.keyId | default "keyId" }}
                   {{- else }}
                   name: {{ include "supabase.secret.s3" . }}
                   key: keyId
@@ -163,9 +163,9 @@ spec:
             - name: S3_PROTOCOL_ACCESS_KEY_SECRET
               valueFrom:
                 secretKeyRef:
-                  {{- if .Values.secret.s3.secretRef }}
-                  name: {{ .Values.secret.s3.secretRef }}
-                  key: {{ .Values.secret.s3.secretRefKey.accessKey | default "accessKey" }}
+                  {{- if .Values.secret.s3.existingSecret }}
+                  name: {{ .Values.secret.s3.existingSecret }}
+                  key: {{ .Values.secret.s3.existingSecretKey.accessKey | default "accessKey" }}
                   {{- else }}
                   name: {{ include "supabase.secret.s3" . }}
                   key: accessKey
@@ -188,9 +188,9 @@ spec:
             - name: AWS_ACCESS_KEY_ID
               valueFrom:
                 secretKeyRef:
-                {{- if .Values.secret.minio.secretRef }}
-                  name: {{ .Values.secret.minio.secretRef }}
-                  key: {{ .Values.secret.minio.secretRefKey.user | default "user" }}
+                {{- if .Values.secret.minio.existingSecret }}
+                  name: {{ .Values.secret.minio.existingSecret }}
+                  key: {{ .Values.secret.minio.existingSecretKey.user | default "user" }}
                 {{- else }}
                   name: {{ include "supabase.secret.minio" . }}
                   key: user
@@ -198,9 +198,9 @@ spec:
             - name: AWS_SECRET_ACCESS_KEY
               valueFrom:
                 secretKeyRef:
-                {{- if .Values.secret.s3.secretRef }}
-                  name: {{ .Values.secret.s3.secretRef }}
-                  key: {{ .Values.secret.s3.secretRefKey.password | default "password" }}
+                {{- if .Values.secret.s3.existingSecret }}
+                  name: {{ .Values.secret.s3.existingSecret }}
+                  key: {{ .Values.secret.s3.existingSecretKey.password | default "password" }}
                 {{- else }}
                   name: {{ include "supabase.secret.minio" . }}
                   key: password
@@ -209,13 +209,13 @@ spec:
             - name: AWS_ACCESS_KEY_ID
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.secret.s3.secretRef | default (include "supabase.secret.s3" .) }}
-                  key: {{ .Values.secret.s3.secretRefKey.keyId | default "keyId" }}
+                  name: {{ .Values.secret.s3.existingSecret | default (include "supabase.secret.s3" .) }}
+                  key: {{ .Values.secret.s3.existingSecretKey.keyId | default "keyId" }}
             - name: AWS_SECRET_ACCESS_KEY
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.secret.s3.secretRef | default (include "supabase.secret.s3" .) }}
-                  key: {{ .Values.secret.s3.secretRefKey.accessKey | default "accessKey" }}
+                  name: {{ .Values.secret.s3.existingSecret | default (include "supabase.secret.s3" .) }}
+                  key: {{ .Values.secret.s3.existingSecretKey.accessKey | default "accessKey" }}
             {{- end }}
           {{- with .Values.deployment.storage.livenessProbe }}
           livenessProbe:

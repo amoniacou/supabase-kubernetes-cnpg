@@ -34,6 +34,21 @@ spec:
   postgresUID: {{ .Values.cnpg.postgresUID }}
   postgresGID: {{ .Values.cnpg.postgresGID }}
 
+  {{- with .Values.cnpg.serviceAccountTemplate }}
+  {{- if or .annotations .labels }}
+  serviceAccountTemplate:
+    metadata:
+      {{- with .annotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .labels }}
+      labels:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+  {{- end }}
+  {{- end }}
+
   enableSuperuserAccess: true
 
   # Each role's password lives in its own basic-auth Secret created by the
@@ -61,7 +76,7 @@ spec:
           - name: {{ $cm }}
             key: {{ $key }}
           {{- end }}
-          {{- if and .Values.secret.jwt (not .Values.secret.jwt.secretRef) }}
+          {{- if and .Values.secret.jwt (not .Values.secret.jwt.existingSecret) }}
           # 99-jwt.sql is materialized by the jwt-generator Job with literal values
           # (not env-var indirection), so it works during CNPG's bootstrap.initdb.
           - name: {{ include "supabase.secret.jwt" . }}-sql

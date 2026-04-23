@@ -35,12 +35,14 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 Create the name of the service account to use
 */}}
 {{- define "supabase.functions.serviceAccountName" -}}
-{{- if .Values.serviceAccount.functions.create }}
-{{- default (include "supabase.functions.fullname" .) .Values.serviceAccount.functions.name }}
-{{- else }}
-{{- default "default" .Values.serviceAccount.functions.name }}
-{{- end }}
-{{- end }}
+{{- if .Values.serviceAccount.functions.create -}}
+{{- default (include "supabase.functions.fullname" .) .Values.serviceAccount.functions.name -}}
+{{- else if .Values.serviceAccount.functions.name -}}
+{{- .Values.serviceAccount.functions.name -}}
+{{- else -}}
+{{- include "supabase.serviceAccountName" . -}}
+{{- end -}}
+{{- end -}}
 
 {{/*
 Persistent volume claim name for edge functions shared storage

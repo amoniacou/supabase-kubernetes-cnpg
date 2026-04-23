@@ -23,6 +23,8 @@ scripts/              # Dev helpers
   helm-deploy.sh        # Install/upgrade the chart against a kind cluster
   helm-undeploy.sh      # Uninstall (keeps PVCs by default)
   fetch-db-init.sh      # Regenerate files/db/*.sql from supabase/postgres upstream
+  ct-test.sh            # Mirror the GitHub Actions test job on a local kind cluster
+ct.yaml               # chart-testing config (shared by CI and scripts/ct-test.sh)
 values/               # (optional) per-environment values overrides
   supabase.yaml         # base override applied by helm-deploy.sh if present
   supabase.local.yaml   # dev-only override, gitignored in your workflow
@@ -74,7 +76,7 @@ Full chart documentation is in [`charts/supabase/README.md`](./charts/supabase/R
   - `jwt-generator` — HS256 (`JWT_SECRET`, `anonKey`, `serviceKey`), ES256 (`anonKeyAsymmetric`, `serviceKeyAsymmetric`, `jwtKeys`, `jwtJwks`), opaque `sb_publishable_*` / `sb_secret_*`.
   - `db-generator` — one random password per Postgres role, stored as `basic-auth` Secrets.
   - `credentials-generator` — Studio dashboard password, Logflare tokens, S3 keyId/accessKey, Realtime `SECRET_KEY_BASE`, postgres-meta `cryptoKey`, MinIO root password.
-  Idempotent: existing Secrets are never overwritten. Bring-your-own via `secret.<component>.secretRef`. Non-password inline overrides (`dashboard.username`, `dashboard.openAiApiKey`, `minio.user`) still supported.
+  Idempotent: existing Secrets are never overwritten. Bring-your-own via `secret.<component>.existingSecret`. Non-password inline overrides (`dashboard.username`, `dashboard.openAiApiKey`, `minio.user`) still supported.
 - **Per-role DB secrets** — a second pre-install Job creates one `basic-auth` Secret per Postgres role (`postgres`, `authenticator`, `supabase_auth_admin`, …). CNPG and each service read only their own credential.
 - **Kong entrypoint** aligned with the upstream `supabase/supabase` `docker/volumes/api/kong-entrypoint.sh` — honors both legacy `anon`/`service_role` keys and the new asymmetric `SUPABASE_PUBLISHABLE_KEY` / `SUPABASE_SECRET_KEY` pair.
 - **PodDisruptionBudgets** — opt-in per stateless service via `deployment.<svc>.podDisruptionBudget.enabled`. CNPG manages the Postgres PDB itself.
@@ -90,6 +92,36 @@ CNPG's own `initdb` bypasses the `supabase/postgres` image's `docker-entrypoint-
 ```
 
 See [charts/supabase/README.md#database-bootstrap](./charts/supabase/README.md#database-bootstrap) for details and the list of skipped migrations.
+
+## Continuous integration
+
+GitHub Actions run `helm/chart-testing` against every pull request:
+
+- `.github/workflows/lint.yaml` — `ct lint` on changed charts.
+- `.github/workflows/test.yaml` — spins up a kind cluster, installs the
+  CloudNativePG operator (version pinned via the workflow env; kept in sync
+  with `scripts/cluster.sh`), then runs `ct install`. A 20-minute Helm
+  `--timeout` is configured globally in `ct.yaml` to accommodate the full
+  Supabase stack + CNPG bootstrap.
+- `.github/dependabot.yaml` — weekly GitHub Actions version bumps.
+
+### Local CI parity
+
+`scripts/ct-test.sh` mirrors the PR test workflow on a local kind cluster,
+so you can reproduce CI failures before pushing:
+
+```bash
+./scripts/ct-test.sh            # lint + create kind + install CNPG + ct install
+./scripts/ct-test.sh lint       # only ct lint (no cluster)
+./scripts/ct-test.sh install    # only the install phase
+./scripts/ct-test.sh destroy    # delete the kind cluster
+```
+
+Env overrides: `CLUSTER_NAME`, `K8S_VERSION`, `CNPG_VERSION`,
+`CNPG_RELEASE_BRANCH`, `TARGET_BRANCH`. The script intentionally does **not**
+tear the cluster down after a failing `ct install` — use `kubectl --context
+kind-supabase-ct ...` to inspect, then `scripts/ct-test.sh destroy` to clean
+up.
 
 ## Support
 

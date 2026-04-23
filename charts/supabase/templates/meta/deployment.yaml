@@ -63,9 +63,9 @@ spec:
             - name: CRYPTO_KEY
               valueFrom:
                 secretKeyRef:
-                  {{- if .Values.secret.meta.secretRef }}
-                  name: {{ .Values.secret.meta.secretRef }}
-                  key: {{ .Values.secret.meta.secretRefKey.cryptoKey }}
+                  {{- if .Values.secret.meta.existingSecret }}
+                  name: {{ .Values.secret.meta.existingSecret }}
+                  key: {{ .Values.secret.meta.existingSecretKey.cryptoKey | default "cryptoKey" }}
                   {{- else }}
                   name: {{ include "supabase.secret.meta" . }}
                   key: cryptoKey

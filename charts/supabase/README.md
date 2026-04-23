@@ -108,15 +108,15 @@ To bring your own pre-populated Secret (recommended for production, e.g. from an
 ```yaml
 secret:
   jwt:
-    secretRef: my-supabase-jwt
+    existingSecret: my-supabase-jwt
     # Optional: map to actual key names inside the referenced Secret
-    # secretRefKey:
+    # existingSecretKey:
     #   anonKey: anonKey
     #   serviceKey: serviceKey
     #   secret: secret
 ```
 
-When `secretRef` is set, the generator Job is skipped entirely. The referenced Secret must contain all nine keys above. See the [self-hosted auth keys docs](https://supabase.com/docs/guides/self-hosting/self-hosted-auth-keys) for how to produce them.
+When `existingSecret` is set, the generator Job is skipped entirely. The referenced Secret must contain all nine keys above. See the [self-hosted auth keys docs](https://supabase.com/docs/guides/self-hosting/self-hosted-auth-keys) for how to produce them.
 
 ### SMTP Secret
 
@@ -201,8 +201,8 @@ You can also reference an existing Kubernetes Secret:
 ```yaml
 secret:
   bigquery:
-    secretRef: my-bigquery-secret
-    secretRefKey:
+    existingSecret: my-bigquery-secret
+    existingSecretKey:
       gcloudJson: gcloud.json
 ```
 
@@ -243,8 +243,8 @@ Important points to consider:
 - Add SSL to the Postgres cluster via CNPG's [TLS configuration](https://cloudnative-pg.io/documentation/current/certificates/).
 - Add SSL to the Ingress endpoint via `cert-manager` or a LoadBalancer provider.
 - Change the domain in `host:` to your real one.
-- JWT material is generated automatically on first install; for production prefer to bring your own via `secret.jwt.secretRef` from an external secret manager.
-- Override `secret.*` with `secretRef` for every block containing credentials — do not leave the inline defaults in production.
+- JWT material is generated automatically on first install; for production prefer to bring your own via `secret.jwt.existingSecret` from an external secret manager.
+- Override `secret.*` with `existingSecret` for every block containing credentials — do not leave the inline defaults in production.
 
 ## Database bootstrap
 

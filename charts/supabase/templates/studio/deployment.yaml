@@ -68,9 +68,9 @@ spec:
             - name: PG_META_CRYPTO_KEY
               valueFrom:
                 secretKeyRef:
-                  {{- if .Values.secret.meta.secretRef }}
-                  name: {{ .Values.secret.meta.secretRef }}
-                  key: {{ .Values.secret.meta.secretRefKey.cryptoKey | default "cryptoKey" }}
+                  {{- if .Values.secret.meta.existingSecret }}
+                  name: {{ .Values.secret.meta.existingSecret }}
+                  key: {{ .Values.secret.meta.existingSecretKey.cryptoKey | default "cryptoKey" }}
                   {{- else }}
                   name: {{ include "supabase.secret.meta" . }}
                   key: cryptoKey
@@ -80,9 +80,10 @@ spec:
             - name: OPENAI_API_KEY
               valueFrom:
                 secretKeyRef:
-                  {{- if .Values.secret.dashboard.secretRef }}
-                  name: {{ .Values.secret.dashboard.secretRef }}
-                  key: {{ .Values.secret.dashboard.secretRefKey.openAiApiKey | default "openAiApiKey" }}
+                  optional: true
+                  {{- if .Values.secret.dashboard.existingSecret }}
+                  name: {{ .Values.secret.dashboard.existingSecret }}
+                  key: {{ .Values.secret.dashboard.existingSecretKey.openAiApiKey | default "openAiApiKey" }}
                   {{- else }}
                   name: {{ include "supabase.secret.dashboard" . }}
                   key: openAiApiKey
@@ -91,9 +92,9 @@ spec:
             - name: SUPABASE_ANON_KEY
               valueFrom:
                 secretKeyRef:
-                  {{- if .Values.secret.jwt.secretRef }}
-                  name: {{ .Values.secret.jwt.secretRef }}
-                  key: {{ .Values.secret.jwt.secretRefKey.anonKey | default "anonKey" }}
+                  {{- if .Values.secret.jwt.existingSecret }}
+                  name: {{ .Values.secret.jwt.existingSecret }}
+                  key: {{ .Values.secret.jwt.existingSecretKey.anonKey | default "anonKey" }}
                   {{- else }}
                   name: {{ include "supabase.secret.jwt" . }}
                   key: anonKey
@@ -102,9 +103,9 @@ spec:
             - name: SUPABASE_SERVICE_KEY
               valueFrom:
                 secretKeyRef:
-                  {{- if .Values.secret.jwt.secretRef }}
-                  name: {{ .Values.secret.jwt.secretRef }}
-                  key: {{ .Values.secret.jwt.secretRefKey.serviceKey | default "serviceKey" }}
+                  {{- if .Values.secret.jwt.existingSecret }}
+                  name: {{ .Values.secret.jwt.existingSecret }}
+                  key: {{ .Values.secret.jwt.existingSecretKey.serviceKey | default "serviceKey" }}
                   {{- else }}
                   name: {{ include "supabase.secret.jwt" . }}
                   key: serviceKey
@@ -113,9 +114,9 @@ spec:
             - name: AUTH_JWT_SECRET
               valueFrom:
                 secretKeyRef:
-                  {{- if .Values.secret.jwt.secretRef }}
-                  name: {{ .Values.secret.jwt.secretRef }}
-                  key: {{ .Values.secret.jwt.secretRefKey.secret | default "secret" }}
+                  {{- if .Values.secret.jwt.existingSecret }}
+                  name: {{ .Values.secret.jwt.existingSecret }}
+                  key: {{ .Values.secret.jwt.existingSecretKey.secret | default "secret" }}
                   {{- else }}
                   name: {{ include "supabase.secret.jwt" . }}
                   key: secret
@@ -127,9 +128,9 @@ spec:
             - name:  LOGFLARE_PUBLIC_ACCESS_TOKEN
               valueFrom:
                 secretKeyRef:
-                  {{- if .Values.secret.analytics.secretRef }}
-                  name: {{ .Values.secret.analytics.secretRef }}
-                  key: {{ .Values.secret.analytics.secretRefKey.publicAccessToken | default "publicAccessToken" }}
+                  {{- if .Values.secret.analytics.existingSecret }}
+                  name: {{ .Values.secret.analytics.existingSecret }}
+                  key: {{ .Values.secret.analytics.existingSecretKey.publicAccessToken | default "publicAccessToken" }}
                   {{- else }}
                   name: {{ include "supabase.secret.analytics" . }}
                   key: publicAccessToken
@@ -137,9 +138,9 @@ spec:
             - name: LOGFLARE_PRIVATE_ACCESS_TOKEN
               valueFrom:
                 secretKeyRef:
-                  {{- if .Values.secret.analytics.secretRef }}
-                  name: {{ .Values.secret.analytics.secretRef }}
-                  key: {{ .Values.secret.analytics.secretRefKey.privateAccessToken | default "privateAccessToken" }}
+                  {{- if .Values.secret.analytics.existingSecret }}
+                  name: {{ .Values.secret.analytics.existingSecret }}
+                  key: {{ .Values.secret.analytics.existingSecretKey.privateAccessToken | default "privateAccessToken" }}
                   {{- else }}
                   name: {{ include "supabase.secret.analytics" . }}
                   key: privateAccessToken

@@ -72,9 +72,9 @@ spec:
             - name: JWT_SECRET
               valueFrom:
                 secretKeyRef:
-                  {{- if .Values.secret.jwt.secretRef }}
-                  name: {{ .Values.secret.jwt.secretRef }}
-                  key: {{ .Values.secret.jwt.secretRefKey.secret | default "secret" }}
+                  {{- if .Values.secret.jwt.existingSecret }}
+                  name: {{ .Values.secret.jwt.existingSecret }}
+                  key: {{ .Values.secret.jwt.existingSecretKey.secret | default "secret" }}
                   {{- else }}
                   name: {{ include "supabase.secret.jwt" . }}
                   key: secret
@@ -82,9 +82,9 @@ spec:
             - name: API_JWT_SECRET
               valueFrom:
                 secretKeyRef:
-                  {{- if .Values.secret.jwt.secretRef }}
-                  name: {{ .Values.secret.jwt.secretRef }}
-                  key: {{ .Values.secret.jwt.secretRefKey.secret | default "secret" }}
+                  {{- if .Values.secret.jwt.existingSecret }}
+                  name: {{ .Values.secret.jwt.existingSecret }}
+                  key: {{ .Values.secret.jwt.existingSecretKey.secret | default "secret" }}
                   {{- else }}
                   name: {{ include "supabase.secret.jwt" . }}
                   key: secret
@@ -99,9 +99,9 @@ spec:
             - name: SECRET_KEY_BASE
               valueFrom:
                 secretKeyRef:
-                  {{- if .Values.secret.realtime.secretRef }}
-                  name: {{ .Values.secret.realtime.secretRef }}
-                  key: {{ .Values.secret.realtime.secretRefKey.secretKeyBase | default "secretKeyBase" }}
+                  {{- if .Values.secret.realtime.existingSecret }}
+                  name: {{ .Values.secret.realtime.existingSecret }}
+                  key: {{ .Values.secret.realtime.existingSecretKey.secretKeyBase | default "secretKeyBase" }}
                   {{- else }}
                   name: {{ include "supabase.secret.realtime" . }}
                   key: secretKeyBase

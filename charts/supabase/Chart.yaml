@@ -15,7 +15,7 @@ type: application
 # This is the chart version. This version number should be incremented each time you make changes
 # to the chart and its templates, including the app version.
 # Versions are expected to follow Semantic Versioning (https://semver.org/)
-version: 0.6.0
+version: 0.7.0
 
 # Default supabase/postgres image tag used by the CNPG cluster. Per-deploy
 # overrides via `cnpg.image.tag`. Bump this when syncing a new upstream

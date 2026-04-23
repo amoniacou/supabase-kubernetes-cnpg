@@ -16,9 +16,9 @@ spec:
             - name: DASHBOARD_USERNAME
               valueFrom:
                 secretKeyRef:
-                  {{- if .Values.secret.dashboard.secretRef }}
-                  name: {{ .Values.secret.dashboard.secretRef }}
-                  key: {{ .Values.secret.dashboard.secretRefKey.username | default "username" }}
+                  {{- if .Values.secret.dashboard.existingSecret }}
+                  name: {{ .Values.secret.dashboard.existingSecret }}
+                  key: {{ .Values.secret.dashboard.existingSecretKey.username | default "username" }}
                   {{- else }}
                   name: {{ include "supabase.secret.dashboard" . }}
                   key: username
@@ -26,9 +26,9 @@ spec:
             - name: DASHBOARD_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  {{- if .Values.secret.dashboard.secretRef }}
-                  name: {{ .Values.secret.dashboard.secretRef }}
-                  key: {{ .Values.secret.dashboard.secretRefKey.password | default "password" }}
+                  {{- if .Values.secret.dashboard.existingSecret }}
+                  name: {{ .Values.secret.dashboard.existingSecret }}
+                  key: {{ .Values.secret.dashboard.existingSecretKey.password | default "password" }}
                   {{- else }}
                   name: {{ include "supabase.secret.dashboard" . }}
                   key: password

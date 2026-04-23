@@ -44,9 +44,9 @@ spec:
             - name: SUPABASE_ANON_KEY
               valueFrom:
                 secretKeyRef:
-                  {{- if .Values.secret.jwt.secretRef }}
-                  name: {{ .Values.secret.jwt.secretRef }}
-                  key: {{ .Values.secret.jwt.secretRefKey.anonKey | default "anonKey" }}
+                  {{- if .Values.secret.jwt.existingSecret }}
+                  name: {{ .Values.secret.jwt.existingSecret }}
+                  key: {{ .Values.secret.jwt.existingSecretKey.anonKey | default "anonKey" }}
                   {{- else }}
                   name: {{ include "supabase.secret.jwt" . }}
                   key: anonKey
@@ -54,9 +54,9 @@ spec:
             - name: SUPABASE_SERVICE_KEY
               valueFrom:
                 secretKeyRef:
-                  {{- if .Values.secret.jwt.secretRef }}
-                  name: {{ .Values.secret.jwt.secretRef }}
-                  key: {{ .Values.secret.jwt.secretRefKey.serviceKey | default "serviceKey" }}
+                  {{- if .Values.secret.jwt.existingSecret }}
+                  name: {{ .Values.secret.jwt.existingSecret }}
+                  key: {{ .Values.secret.jwt.existingSecretKey.serviceKey | default "serviceKey" }}
                   {{- else }}
                   name: {{ include "supabase.secret.jwt" . }}
                   key: serviceKey
@@ -86,9 +86,9 @@ spec:
             - name: DASHBOARD_USERNAME
               valueFrom:
                 secretKeyRef:
-                  {{- if .Values.secret.dashboard.secretRef }}
-                  name: {{ .Values.secret.dashboard.secretRef }}
-                  key: {{ .Values.secret.dashboard.secretRefKey.username | default "username" }}
+                  {{- if .Values.secret.dashboard.existingSecret }}
+                  name: {{ .Values.secret.dashboard.existingSecret }}
+                  key: {{ .Values.secret.dashboard.existingSecretKey.username | default "username" }}
                   {{- else }}
                   name: {{ include "supabase.secret.dashboard" . }}
                   key: username
@@ -96,9 +96,9 @@ spec:
             - name: DASHBOARD_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  {{- if .Values.secret.dashboard.secretRef }}
-                  name: {{ .Values.secret.dashboard.secretRef }}
-                  key: {{ .Values.secret.dashboard.secretRefKey.password | default "password" }}
+                  {{- if .Values.secret.dashboard.existingSecret }}
+                  name: {{ .Values.secret.dashboard.existingSecret }}
+                  key: {{ .Values.secret.dashboard.existingSecretKey.password | default "password" }}
                   {{- else }}
                   name: {{ include "supabase.secret.dashboard" . }}
                   key: password

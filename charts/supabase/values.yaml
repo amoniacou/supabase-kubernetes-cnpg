@@ -56,14 +56,14 @@ secret:
     ## Reference to an existing Secret with pre-populated keys (see list above).
     ## When set (non-empty), the generator Job is skipped and services read
     ## all keys from this Secret.
-    secretRef: ""
-    ## Map to actual key names inside secretRef if they differ from the
+    existingSecret: null
+    ## Map to actual key names inside existingSecret if they differ from the
     ## defaults (anonKey, serviceKey, secret, publishableKey, secretKey,
     ## anonKeyAsymmetric, serviceRoleKeyAsymmetric, jwtKeys, jwtJwks).
-    # secretRefKey:
-    #   anonKey: anonKey
-    #   serviceKey: serviceKey
-    #   secret: secret
+    existingSecretKey:
+      anonKey: anonKey
+      serviceKey: serviceKey
+      secret: secret
 
     ## PostgreSQL credentials
     ##
@@ -99,73 +99,74 @@ secret:
     ## accept optional inline overrides. Existing Secrets are never overwritten
     ## — delete the Secret to trigger regeneration.
     ##
-    ## For production bring-your-own, set `<secret>.secretRef` to the name of
+    ## For production bring-your-own, set `<secret>.existingSecret` to the name of
     ## a pre-populated Secret; the generator then skips that entry entirely.
 
     ## Logflare credentials (publicAccessToken, privateAccessToken) — both random.
   analytics:
-    secretRef: ""
-    # secretRefKey:
-    #   publicAccessToken: publicAccessToken
-    #   privateAccessToken: privateAccessToken
+    existingSecret: null
+    existingSecretKey:
+      publicAccessToken: publicAccessToken
+      privateAccessToken: privateAccessToken
 
     ## BigQuery service account credentials (gcloud.json). Bring-your-own only
     ## — can't be generated. Leave gcloudJson empty unless BigQuery is enabled.
   bigquery:
     gcloudJson: ""
-    secretRef: ""
-    # secretRefKey:
-    #   gcloudJson: gcloud.json
+    existingSecret: null
+    existingSecretKey:
+      gcloudJson: gcloud.json
 
     ## SMTP credentials (username, password). Bring-your-own only — real mail
     ## server login, can't be generated. Leave empty for no outbound mail.
   smtp:
     username: ""
     password: ""
-    secretRef: ""
-    # secretRefKey:
-    #   username: username
-    #   password: password
+    existingSecret: null
+    existingSecretKey:
+      username: username
+      password: password
 
     ## Studio dashboard credentials. `username` defaults to "supabase", `password`
     ## is random, `openAiApiKey` is optional (for Studio AI features).
   dashboard:
     # username: "supabase"
     # openAiApiKey: ""
-    secretRef: ""
-    # secretRefKey:
-    #   username: username
-    #   password: password
-    #   openAiApiKey: openAiApiKey
+    existingSecret: null
+    existingSecretKey:
+      username: username
+      password: password
+      openAiApiKey: openAiApiKey
 
     ## S3-compatible credentials (keyId, accessKey) — both random.
   s3:
-    secretRef: ""
-    # secretRefKey:
-    #   keyId: keyId
-    #   accessKey: accessKey
+    existingSecret: null
+    existingSecretKey:
+      keyId: keyId
+      accessKey: accessKey
+      password: password
 
     ## Realtime service SECRET_KEY_BASE (Phoenix) — random.
     ## Docs: https://supabase.com/docs/guides/realtime
   realtime:
-    secretRef: ""
-    # secretRefKey:
-    #   secretKeyBase: secretKeyBase
+    existingSecret: null
+    existingSecretKey:
+      secretKeyBase: secretKeyBase
 
     ## postgres-meta cryptoKey — random.
     ## Docs: https://github.com/supabase/postgres-meta
   meta:
-    secretRef: ""
-    # secretRefKey:
-    #   cryptoKey: cryptoKey
+    existingSecret: null
+    existingSecretKey:
+      cryptoKey: cryptoKey
 
     ## MinIO root credentials. `user` defaults to "supa-storage", `password` is random.
   minio:
     # user: "supa-storage"
-    secretRef: ""
-    # secretRefKey:
-    #   user: user
-    #   password: password
+    existingSecret: null
+    existingSecretKey:
+      user: user
+      password: password
 
 deployment:
   analytics:
@@ -960,61 +961,34 @@ ingress:
     #     - example.com
 
 serviceAccount:
-  analytics:
-    create: true
-    annotations: {}
-    name: ""
+  ## Shared ServiceAccount used by all Supabase services by default. Each
+  ## service falls back to this SA unless its per-service block below sets
+  ## `create: true` (for a dedicated SA, e.g. IRSA / Azure Workload Identity
+  ## where the service needs its own cloud identity) or `name: <existing-sa>`.
+  create: true
+  name: ""
+  annotations: {}
 
-  auth:
-    create: true
-    annotations: {}
-    name: ""
+  ## Per-service overrides. Empty map = use the shared SA above. Set
+  ##   <svc>:
+  ##     create: true
+  ##     annotations: { ... }
+  ## to render a dedicated SA for that service.
+  analytics: {}
+  auth: {}
+  functions: {}
+  imgproxy: {}
+  kong: {}
+  meta: {}
+  minio: {}
+  realtime: {}
+  rest: {}
+  storage: {}
+  studio: {}
 
-  functions:
-    create: true
-    annotations: {}
-    name: ""
-
-  imgproxy:
-    create: true
-    annotations: {}
-    name: ""
-
-  kong:
-    create: true
-    annotations: {}
-    name: ""
-
-  meta:
-    create: true
-    annotations: {}
-    name: ""
-
-  minio:
-    create: true
-    annotations: {}
-    name: ""
-
-  realtime:
-    create: true
-    annotations: {}
-    name: ""
-
-  rest:
-    create: true
-    annotations: {}
-    name: ""
-
-  storage:
-    create: true
-    annotations: {}
-    name: ""
-
-  studio:
-    create: true
-    annotations: {}
-    name: ""
-
+  ## Vector keeps its own SA by default: it is bound to a ClusterRole with
+  ## pods/log list+watch. Routing that binding through the shared SA would
+  ## grant every Supabase service pod/log access cluster-wide.
   vector:
     create: true
     annotations: {}
@@ -1084,6 +1058,14 @@ cnpg:
     limits:
       cpu: "2"
       memory: 4Gi
+
+  ## Annotations/labels for the ServiceAccount CNPG creates for the Postgres
+  ## pods (CNPG owns the SA lifecycle — only metadata can be customized).
+  ## Typical use: IRSA / Azure Workload Identity so the barman-cloud plugin
+  ## can reach S3/blob without static credentials.
+  serviceAccountTemplate:
+    annotations: {}
+    labels: {}
 
   ## PostgreSQL configuration overrides. Mirrors the working Supabase/CNPG
   ## reference config: Supabase-specific extensions (pg_net, pg_cron, pgaudit,

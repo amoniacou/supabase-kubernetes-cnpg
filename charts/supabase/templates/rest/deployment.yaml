@@ -83,9 +83,9 @@ spec:
             - name: PGRST_APP_SETTINGS_JWT_SECRET
               valueFrom:
                 secretKeyRef:
-                  {{- if .Values.secret.jwt.secretRef }}
-                  name: {{ .Values.secret.jwt.secretRef }}
-                  key: {{ .Values.secret.jwt.secretRefKey.secret | default "secret" }}
+                  {{- if .Values.secret.jwt.existingSecret }}
+                  name: {{ .Values.secret.jwt.existingSecret }}
+                  key: {{ .Values.secret.jwt.existingSecretKey.secret | default "secret" }}
                   {{- else }}
                   name: {{ include "supabase.secret.jwt" . }}
                   key: secret
