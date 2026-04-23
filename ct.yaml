@@ -1,0 +1,4 @@
+chart-dirs:
+  - charts
+helm-extra-args: --timeout 1200s
+validate-maintainers: false

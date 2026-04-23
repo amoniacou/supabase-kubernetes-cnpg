@@ -62,6 +62,12 @@ and this chart adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.h
   `credentials-generator`) now share a single pre-install ServiceAccount +
   Role + RoleBinding (`<fullname>-generator`) instead of provisioning one
   set each. Net: 6 fewer RBAC resources per release.
+- Kong, Vector and Edge Functions ConfigMap bodies moved out of the
+  templates into `files/kong/{kong-entrypoint.sh,temp.yml}`,
+  `files/vector/vector.yml` and `files/functions/index.ts`, loaded via
+  `tpl (.Files.Get …) .`. Pure refactor — rendered ConfigMap data is
+  byte-identical. Pattern mirrors upstream
+  [supabase-community/supabase-kubernetes@f331cb4](https://github.com/supabase-community/supabase-kubernetes/commit/f331cb4f2fdab234f966fdc3e882f8565a81ab58).
 
 ### Migration
 
