@@ -104,6 +104,9 @@ spec:
                   key: password
                   {{- end }}
             {{- end }}
+            {{- with .Values.deployment.kong.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
           {{- with .Values.deployment.kong.livenessProbe }}
           livenessProbe:
             {{- toYaml . | nindent 12 }}

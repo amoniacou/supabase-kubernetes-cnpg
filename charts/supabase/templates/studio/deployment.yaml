@@ -154,6 +154,9 @@ spec:
             - name: SNIPPETS_MANAGEMENT_FOLDER
               value: /app/snippets
             {{- end }}
+            {{- with .Values.deployment.studio.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
           {{- with .Values.deployment.studio.livenessProbe }}
           livenessProbe:
             {{- toYaml . | nindent 12 }}

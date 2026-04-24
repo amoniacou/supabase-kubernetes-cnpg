@@ -99,6 +99,9 @@ spec:
                   {{- end }}
             - name: SUPABASE_DB_URL
               value: $(DB_DRIVER)://$(DB_USERNAME):$(DB_PASSWORD_ENC)@$(DB_HOSTNAME):$(DB_PORT)/$(DB_DATABASE)?search_path=auth&sslmode=$(DB_SSL)
+            {{- with .Values.deployment.functions.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
           {{- with .Values.deployment.functions.livenessProbe }}
           livenessProbe:
             {{- toYaml . | nindent 12 }}

@@ -70,8 +70,9 @@ spec:
                   name: {{ include "supabase.secret.meta" . }}
                   key: cryptoKey
                   {{- end }}
-
-
+            {{- with .Values.deployment.meta.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
           {{- with .Values.deployment.meta.livenessProbe }}
           livenessProbe:
             {{- toYaml . | nindent 12 }}

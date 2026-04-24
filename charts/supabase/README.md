@@ -234,6 +234,37 @@ Supabase storage supports the use of S3 object-storage. To enable S3 for Supabas
     enabled: true
   ```
 
+### Extra env (secret references, OAuth providers, …)
+
+Every service exposes `deployment.<svc>.extraEnv`, a raw list of Kubernetes container env entries appended to the pod's `env:`. Use it when you need `valueFrom` — secret/configmap keys, field refs, resource refs — so sensitive values never appear in `values.yaml`. Plain literal values still go in `environment.<svc>` (rendered as `value:`).
+
+Example — configure a Google OAuth provider for GoTrue. Public settings are literals, credentials reference a Secret you create out-of-band (e.g. via `kubectl create secret`, External Secrets, Sealed Secrets):
+
+```yaml
+environment:
+  auth:
+    GOTRUE_EXTERNAL_GOOGLE_ENABLED: "true"
+    GOTRUE_EXTERNAL_GOOGLE_REDIRECT_URI: "https://supabase.local/auth/v1/callback"
+
+deployment:
+  auth:
+    extraEnv:
+      - name: GOTRUE_EXTERNAL_GOOGLE_CLIENT_ID
+        valueFrom:
+          secretKeyRef:
+            name: my-oauth
+            key: google-client-id
+      - name: GOTRUE_EXTERNAL_GOOGLE_SECRET
+        valueFrom:
+          secretKeyRef:
+            name: my-oauth
+            key: google-secret
+```
+
+Full list of provider env vars (Apple, Azure, GitHub, GitLab, Keycloak, Slack, etc.): [GoTrue config reference](https://github.com/supabase/auth/blob/master/example.env). The same pattern works for any variable on any service — not just auth providers.
+
+Entries are appended verbatim; avoid re-declaring env names already set by the chart (DB_HOST, JWT secrets, etc.).
+
 ## How to use in Production
 
 Important points to consider:

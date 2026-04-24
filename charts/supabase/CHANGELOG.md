@@ -38,6 +38,14 @@ and this chart adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.h
 - `OPENAI_API_KEY` in the Studio Deployment is now declared as
   `secretKeyRef.optional: true`, so bring-your-own `secret.dashboard.existingSecret`
   without an `openAiApiKey` entry no longer blocks Studio startup.
+- `deployment.<svc>.extraEnv` on every service (analytics, auth, functions,
+  imgproxy, kong, meta, minio, realtime, rest, storage, studio, vector) —
+  a raw list of container env entries appended to the pod's `env:`. Intended
+  for `valueFrom` injection (secret/configmap keys, field refs) so sensitive
+  values stay out of `values.yaml`. Plain literals still belong in
+  `environment.<svc>`. Primary use case: wiring GoTrue external OAuth
+  providers (`GOTRUE_EXTERNAL_<PROVIDER>_CLIENT_ID` / `_SECRET`) via
+  `secretKeyRef` without chart changes.
 
 ### Fixed
 

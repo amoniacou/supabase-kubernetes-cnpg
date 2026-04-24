@@ -217,6 +217,9 @@ spec:
                   name: {{ .Values.secret.s3.existingSecret | default (include "supabase.secret.s3" .) }}
                   key: {{ .Values.secret.s3.existingSecretKey.accessKey | default "accessKey" }}
             {{- end }}
+            {{- with .Values.deployment.storage.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
           {{- with .Values.deployment.storage.livenessProbe }}
           livenessProbe:
             {{- toYaml . | nindent 12 }}

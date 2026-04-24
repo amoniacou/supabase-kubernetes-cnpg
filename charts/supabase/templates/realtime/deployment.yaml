@@ -106,7 +106,9 @@ spec:
                   name: {{ include "supabase.secret.realtime" . }}
                   key: secretKeyBase
                   {{- end }}
-
+            {{- with .Values.deployment.realtime.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
           {{- with .Values.deployment.realtime.livenessProbe }}
           livenessProbe:
             {{- toYaml . | nindent 12 }}

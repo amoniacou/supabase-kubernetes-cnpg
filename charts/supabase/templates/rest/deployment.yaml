@@ -90,6 +90,9 @@ spec:
                   name: {{ include "supabase.secret.jwt" . }}
                   key: secret
                   {{- end }}
+            {{- with .Values.deployment.rest.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
           {{- with .Values.deployment.rest.livenessProbe }}
           livenessProbe:
             {{- toYaml . | nindent 12 }}

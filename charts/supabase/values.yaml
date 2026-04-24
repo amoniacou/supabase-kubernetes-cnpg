@@ -169,6 +169,33 @@ secret:
       password: password
 
 deployment:
+  ## `extraEnv` (per service, below) is a raw list of container env entries
+  ## appended to the container's `env:`. Use it only for variables that need
+  ## `valueFrom` — secret/configmap keys, field refs, resource refs. Plain
+  ## literal values belong in `environment.<svc>` (rendered as `value:`).
+  ## Entries are appended verbatim; avoid re-declaring names already set by
+  ## the template.
+  ##
+  ## Example — OAuth provider secrets for auth (literals in `environment.auth`,
+  ## secrets here):
+  ##   environment:
+  ##     auth:
+  ##       GOTRUE_EXTERNAL_GOOGLE_ENABLED: "true"
+  ##       GOTRUE_EXTERNAL_GOOGLE_REDIRECT_URI: "https://supabase.local/auth/v1/callback"
+  ##   deployment:
+  ##     auth:
+  ##       extraEnv:
+  ##         - name: GOTRUE_EXTERNAL_GOOGLE_CLIENT_ID
+  ##           valueFrom:
+  ##             secretKeyRef:
+  ##               name: my-oauth
+  ##               key: google-client-id
+  ##         - name: GOTRUE_EXTERNAL_GOOGLE_SECRET
+  ##           valueFrom:
+  ##             secretKeyRef:
+  ##               name: my-oauth
+  ##               key: google-secret
+
   analytics:
     enabled: true
     replicaCount: 1
@@ -186,6 +213,7 @@ deployment:
     volumeMounts: {}
     volumes: {}
     resources: {}
+    extraEnv: []
     podDisruptionBudget:
       enabled: false
       # minAvailable: 1
@@ -208,6 +236,7 @@ deployment:
     volumeMounts: {}
     volumes: {}
     resources: {}
+    extraEnv: []
     podDisruptionBudget:
       enabled: false
       # minAvailable: 1
@@ -230,6 +259,7 @@ deployment:
     volumeMounts: {}
     volumes: {}
     resources: {}
+    extraEnv: []
     podDisruptionBudget:
       enabled: false
       # minAvailable: 1
@@ -252,6 +282,7 @@ deployment:
     volumeMounts: {}
     volumes: {}
     resources: {}
+    extraEnv: []
     podDisruptionBudget:
       enabled: false
       # minAvailable: 1
@@ -274,6 +305,7 @@ deployment:
     volumeMounts: {}
     volumes: {}
     resources: {}
+    extraEnv: []
     podDisruptionBudget:
       enabled: false
       # minAvailable: 1
@@ -296,6 +328,7 @@ deployment:
     volumeMounts: {}
     volumes: {}
     resources: {}
+    extraEnv: []
     podDisruptionBudget:
       enabled: false
       # minAvailable: 1
@@ -318,6 +351,7 @@ deployment:
     volumeMounts: {}
     volumes: {}
     resources: {}
+    extraEnv: []
 
   realtime:
     enabled: true
@@ -336,6 +370,7 @@ deployment:
     volumeMounts: {}
     volumes: {}
     resources: {}
+    extraEnv: []
     podDisruptionBudget:
       enabled: false
       # minAvailable: 1
@@ -358,6 +393,7 @@ deployment:
     volumeMounts: {}
     volumes: {}
     resources: {}
+    extraEnv: []
     podDisruptionBudget:
       enabled: false
       # minAvailable: 1
@@ -380,6 +416,7 @@ deployment:
     volumeMounts: {}
     volumes: {}
     resources: {}
+    extraEnv: []
     extraInitContainers: []
     podDisruptionBudget:
       enabled: false
@@ -403,6 +440,7 @@ deployment:
     volumeMounts: {}
     volumes: {}
     resources: {}
+    extraEnv: []
     podDisruptionBudget:
       enabled: false
       # minAvailable: 1
@@ -425,6 +463,7 @@ deployment:
     volumeMounts: {}
     volumes: {}
     resources: {}
+    extraEnv: []
 
 image:
   analytics:

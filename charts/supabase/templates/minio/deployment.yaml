@@ -61,6 +61,9 @@ spec:
                   name: {{ include "supabase.secret.minio" . }}
                   key: password
                 {{- end }}
+            {{- with .Values.deployment.minio.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
           {{- with .Values.deployment.minio.livenessProbe }}
           livenessProbe:
             {{- toYaml . | nindent 12 }}

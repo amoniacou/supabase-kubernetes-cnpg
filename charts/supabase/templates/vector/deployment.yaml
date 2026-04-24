@@ -60,6 +60,9 @@ spec:
                   key: publicAccessToken
                   {{- end }}
             {{- end }}
+            {{- with .Values.deployment.vector.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
           {{- with .Values.deployment.vector.livenessProbe }}
           livenessProbe:
             {{- toYaml . | nindent 12 }}
