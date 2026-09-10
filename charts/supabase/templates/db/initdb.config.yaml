@@ -14,6 +14,8 @@ data:
 {{ .Files.Get "files/db/init.sql" | indent 4 }}
   01-migrations.sql: |
 {{ .Files.Get "files/db/migrations.sql" | indent 4 }}
+  10-pg_stat_statements.sql: |
+{{ .Files.Get "files/db/10-pg_stat_statements.sql" | indent 4 }}
   99-realtime.sql: |
     CREATE SCHEMA IF NOT EXISTS _realtime;
     ALTER SCHEMA _realtime OWNER TO supabase_admin;
